@@ -1,0 +1,49 @@
+{
+  "name": "uxai-review",
+  "version": "0.1.0",
+  "description": "Local HTML prototype review workspace and MCP server",
+  "type": "module",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "bin": {
+    "uxai-review": "dist/cli/index.js"
+  },
+  "files": [
+    "dist",
+    "skills",
+    "schemas",
+    "examples/starter",
+    "docs",
+    "README.md"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json && vite build && node scripts/build-bridge.mjs && node scripts/export-schema.mjs",
+    "test": "vitest run",
+    "test:browser": "node tests/browser/workflow.mjs",
+    "test:package": "node tests/package/install.mjs",
+    "test:codex": "node tests/integration/codex-smoke.mjs && node tests/integration/codex-interruption.mjs",
+    "test:starter": "node tests/browser/starter.mjs",
+    "test:gateway": "node tests/browser/gateway.mjs",
+    "preview:starter": "node scripts/preview-starter.mjs",
+    "prepack": "npm run build",
+    "test:deleted": "node tests/browser/deleted.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "fastify": "5.12.8",
+    "playwright": "1.65.0",
+    "acorn": "8.15.0",
+    "parse5": "8.1.1",
+    "postcss-value-parser": "4.2.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2",
+    "@types/node": "24.19.2",
+    "vite": "8.3.6",
+    "vitest": "5.1.0"
+  }
+}

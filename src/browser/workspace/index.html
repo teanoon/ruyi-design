@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>UXAI Review</title>
+  </head>
+  <body>
+    <a class="skip" href="#canvas">跳到预览</a>
+    <div id="app">
+      <header>
+        <div class="brand">
+          <span class="brandmark" aria-hidden="true">U</span
+          ><strong>UXAI <span>Review</span></strong
+          ><span class="divider"></span><span id="project">设计评审工作区</span>
+        </div>
+        <div class="header-right">
+          <span id="activity" role="status">连接中</span
+          ><span id="revision" class="badge"></span>
+        </div>
+      </header>
+      <div class="layout">
+        <aside class="navigation">
+          <div class="section-label">WORKSPACE</div>
+          <button id="preview-toggle" class="secondary preview-toggle" aria-pressed="false">预览</button>
+          <nav id="navigation" aria-label="设计导航"></nav>
+          <div class="nav-footer">
+            本地原型 · 持续评审<br /><span>页面、状态与设备，一处查看。</span>
+          </div>
+        </aside>
+        <main>
+          <div class="toolbar">
+            <div>
+              <div class="section-label" id="eyebrow">PROTOTYPE</div>
+              <h1 id="title">选择设计稿</h1>
+            </div>
+            <div class="controls">
+              <label id="state-control">状态
+                <select id="state" aria-label="状态"></select></label>
+              <label>设备
+                <select id="device" aria-label="设备"></select></label>
+            </div>
+          </div>
+          <div id="history-banner" class="history-banner" hidden>
+            <span id="history-version"></span>
+            <button id="return-latest" class="secondary">返回最新版本</button>
+          </div>
+          <div id="notice" role="status"></div>
+          <div id="canvas" tabindex="-1"></div>
+        </main>
+        <aside class="feedback">
+          <div class="feedback-heading">
+            <h2>评审反馈</h2>
+            <span id="count" class="badge">0</span>
+          </div>
+          <p class="hint" id="interaction-hint">点击元素添加评论，保存后在对话中告诉 AI 可以更新。</p>
+          <form id="composer" hidden>
+            <label for="comment-text">评论内容</label>
+            <div id="target-label" class="hint"></div>
+            <textarea
+              id="comment-text"
+              rows="4"
+              required
+              placeholder="描述你希望如何改进…"
+            ></textarea>
+            <div class="row">
+              <button type="button" id="cancel-comment" class="secondary">
+                取消</button
+              ><button type="submit" class="primary">保存评论</button>
+            </div>
+          </form>
+          <div id="comments"></div>
+          <div class="review-next-step">
+            <div id="pending-count" class="hint"></div>
+            <p class="hint">评论保存后，请在 AI 对话中说：<br />“我已评论，可以更新。”</p>
+          </div>
+        </aside>
+      </div>
+    </div>
+    <script type="module" src="/main.ts"></script>
+  </body>
+</html>

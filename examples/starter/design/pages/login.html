@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Northstar · 登录</title>
+    <link rel="stylesheet" href="../components/shared.css" />
+    <link rel="stylesheet" href="./pages.css" />
+  </head>
+  <body>
+    <div class="login">
+      <section class="intro">
+        <div class="wordmark">northstar<span>®</span></div>
+        <div>
+          <span class="kicker">MAKE ROOM FOR GOOD WORK.</span>
+          <h1>让每个好想法，<br />都有向前的一步。</h1>
+          <p>连接团队、计划与灵感，<br />从这里开始更清晰的一天。</p>
+          <div class="intro-proof" data-review-id="login-proof">
+            <div class="intro-proof-top">
+              <span>本周的共同进展</span><span>↗ 24%</span>
+            </div>
+            <strong>一点一点，把想法变成作品。</strong>
+            <div class="progress"><span style="width: 68%"></span></div>
+            <small>Studio 团队已经完成了 17 项小目标。</small>
+          </div>
+        </div>
+        <small>© 2026 Northstar Studio</small>
+      </section>
+      <main class="login-main">
+        <div class="form-card">
+          <div class="mobile-logo">northstar</div>
+          <span class="kicker">YOUR WORK, CONNECTED</span>
+          <h2 data-review-id="login-heading">欢迎回来</h2>
+          <p class="muted">登录你的工作空间，继续创造。</p>
+          <form id="login-form" novalidate>
+            <div id="fields"></div>
+            <div class="remember">
+              <label
+                ><input
+                  id="remember"
+                  data-review-id="remember"
+                  type="checkbox"
+                />
+                记住我</label
+              ><button id="forgot-password" type="button">忘记密码？</button>
+            </div>
+            <div id="submit"></div>
+            <p id="feedback" role="alert"></p>
+          </form>
+          <p class="signup muted">
+            还没有账户？ <a href="./home.html?state=empty">创建工作空间</a>
+          </p>
+          <div class="login-links">
+            <button type="button" id="help">需要帮助</button><span>·</span
+            ><span>让每个好想法，都有容身之处。</span>
+          </div>
+        </div>
+        <footer>专注创造，保持连接。</footer>
+      </main>
+    </div>
+    <dialog
+      class="project-dialog"
+      id="recovery"
+      aria-labelledby="recovery-title"
+    >
+      <h2 id="recovery-title">找回你的工作空间</h2>
+      <p class="muted">填写登录邮箱，我们将帮助你重新连接。</p>
+      <form id="recovery-form" novalidate>
+        <div id="recovery-fields"></div>
+        <p id="recovery-message" role="status"></p>
+        <div id="recovery-actions" class="dialog-actions"></div>
+      </form>
+    </dialog>
+    <script type="module" src="./login.js"></script>
+  </body>
+</html>

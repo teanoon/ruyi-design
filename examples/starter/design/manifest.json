@@ -1,0 +1,748 @@
+{
+  "schemaVersion": 1,
+  "id": "northstar",
+  "name": "Northstar · 团队协作原型",
+  "devices": [
+    {
+      "id": "desktop",
+      "name": "Desktop",
+      "width": 1280,
+      "height": 800
+    },
+    {
+      "id": "mobile",
+      "name": "Mobile",
+      "width": 390,
+      "height": 844
+    }
+  ],
+  "pages": [
+    {
+      "id": "login",
+      "name": "登录",
+      "components": ["button", "input"],
+      "states": [
+        {
+          "id": "default",
+          "name": "默认",
+          "entries": {
+            "desktop": {
+              "path": "pages/login.html"
+            },
+            "mobile": {
+              "path": "pages/login.html"
+            }
+          }
+        },
+        {
+          "id": "error",
+          "name": "输入错误",
+          "entries": {
+            "desktop": {
+              "path": "pages/login.html",
+              "query": {
+                "state": "error"
+              }
+            },
+            "mobile": {
+              "path": "pages/login.html",
+              "query": {
+                "state": "error"
+              }
+            }
+          }
+        },
+        {
+          "id": "loading",
+          "name": "登录中",
+          "entries": {
+            "desktop": {
+              "path": "pages/login.html",
+              "query": {
+                "state": "loading"
+              }
+            },
+            "mobile": {
+              "path": "pages/login.html",
+              "query": {
+                "state": "loading"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "home",
+      "name": "工作台",
+      "components": ["button", "badge", "project-card", "dialog"],
+      "states": [
+        {
+          "id": "default",
+          "name": "有内容",
+          "entries": {
+            "desktop": {
+              "path": "pages/home.html"
+            },
+            "mobile": {
+              "path": "pages/home.html"
+            }
+          }
+        },
+        {
+          "id": "empty",
+          "name": "空数据",
+          "entries": {
+            "desktop": {
+              "path": "pages/home.html",
+              "query": {
+                "state": "empty"
+              }
+            },
+            "mobile": {
+              "path": "pages/home.html",
+              "query": {
+                "state": "empty"
+              }
+            }
+          }
+        },
+        {
+          "id": "loading",
+          "name": "加载中",
+          "entries": {
+            "desktop": {
+              "path": "pages/home.html",
+              "query": {
+                "state": "loading"
+              }
+            },
+            "mobile": {
+              "path": "pages/home.html",
+              "query": {
+                "state": "loading"
+              }
+            }
+          }
+        },
+        {
+          "id": "error",
+          "name": "加载失败",
+          "entries": {
+            "desktop": {
+              "path": "pages/home.html",
+              "query": {
+                "state": "error"
+              }
+            },
+            "mobile": {
+              "path": "pages/home.html",
+              "query": {
+                "state": "error"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "project",
+      "name": "项目详情",
+      "components": ["button", "badge"],
+      "states": [
+        {
+          "id": "default",
+          "name": "项目概览",
+          "entries": {
+            "desktop": {
+              "path": "pages/project.html"
+            },
+            "mobile": {
+              "path": "pages/project.html"
+            }
+          }
+        },
+        {
+          "id": "activity",
+          "name": "项目动态",
+          "entries": {
+            "desktop": {
+              "path": "pages/project.html",
+              "query": {
+                "state": "activity"
+              }
+            },
+            "mobile": {
+              "path": "pages/project.html",
+              "query": {
+                "state": "activity"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "settings",
+      "name": "设置",
+      "components": ["button", "input"],
+      "states": [
+        {
+          "id": "default",
+          "name": "个人资料",
+          "entries": {
+            "desktop": {
+              "path": "pages/settings.html"
+            },
+            "mobile": {
+              "path": "pages/settings.html"
+            }
+          }
+        },
+        {
+          "id": "error",
+          "name": "输入错误",
+          "entries": {
+            "desktop": {
+              "path": "pages/settings.html",
+              "query": {
+                "state": "error"
+              }
+            },
+            "mobile": {
+              "path": "pages/settings.html",
+              "query": {
+                "state": "error"
+              }
+            }
+          }
+        },
+        {
+          "id": "saved",
+          "name": "保存成功",
+          "entries": {
+            "desktop": {
+              "path": "pages/settings.html",
+              "query": {
+                "state": "saved"
+              }
+            },
+            "mobile": {
+              "path": "pages/settings.html",
+              "query": {
+                "state": "saved"
+              }
+            }
+          }
+        },
+        {
+          "id": "notifications",
+          "name": "通知偏好",
+          "entries": {
+            "desktop": {
+              "path": "pages/settings.html",
+              "query": {
+                "state": "notifications"
+              }
+            },
+            "mobile": {
+              "path": "pages/settings.html",
+              "query": {
+                "state": "notifications"
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "components": [
+    {
+      "id": "button",
+      "name": "Button 按钮",
+      "implementation": ["components/button.js", "components/shared.css"],
+      "examples": [
+        {
+          "id": "default",
+          "name": "默认",
+          "entries": {
+            "desktop": {
+              "path": "showcases/button.html"
+            },
+            "mobile": {
+              "path": "showcases/button.html"
+            }
+          }
+        },
+        {
+          "id": "hover",
+          "name": "悬停",
+          "entries": {
+            "desktop": {
+              "path": "showcases/button.html",
+              "query": {
+                "state": "hover"
+              }
+            }
+          }
+        },
+        {
+          "id": "disabled",
+          "name": "禁用",
+          "entries": {
+            "desktop": {
+              "path": "showcases/button.html",
+              "query": {
+                "state": "disabled"
+              }
+            },
+            "mobile": {
+              "path": "showcases/button.html",
+              "query": {
+                "state": "disabled"
+              }
+            }
+          }
+        },
+        {
+          "id": "loading",
+          "name": "加载中",
+          "entries": {
+            "desktop": {
+              "path": "showcases/button.html",
+              "query": {
+                "state": "loading"
+              }
+            },
+            "mobile": {
+              "path": "showcases/button.html",
+              "query": {
+                "state": "loading"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "input",
+      "name": "Input 输入框",
+      "implementation": ["components/input.js", "components/shared.css"],
+      "examples": [
+        {
+          "id": "default",
+          "name": "默认",
+          "entries": {
+            "desktop": {
+              "path": "showcases/input.html"
+            },
+            "mobile": {
+              "path": "showcases/input.html"
+            }
+          }
+        },
+        {
+          "id": "filled",
+          "name": "已填写",
+          "entries": {
+            "desktop": {
+              "path": "showcases/input.html",
+              "query": {
+                "state": "filled"
+              }
+            },
+            "mobile": {
+              "path": "showcases/input.html",
+              "query": {
+                "state": "filled"
+              }
+            }
+          }
+        },
+        {
+          "id": "focus",
+          "name": "聚焦",
+          "entries": {
+            "desktop": {
+              "path": "showcases/input.html",
+              "query": {
+                "state": "focus"
+              }
+            },
+            "mobile": {
+              "path": "showcases/input.html",
+              "query": {
+                "state": "focus"
+              }
+            }
+          }
+        },
+        {
+          "id": "error",
+          "name": "错误",
+          "entries": {
+            "desktop": {
+              "path": "showcases/input.html",
+              "query": {
+                "state": "error"
+              }
+            },
+            "mobile": {
+              "path": "showcases/input.html",
+              "query": {
+                "state": "error"
+              }
+            }
+          }
+        },
+        {
+          "id": "disabled",
+          "name": "禁用",
+          "entries": {
+            "desktop": {
+              "path": "showcases/input.html",
+              "query": {
+                "state": "disabled"
+              }
+            },
+            "mobile": {
+              "path": "showcases/input.html",
+              "query": {
+                "state": "disabled"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "badge",
+      "name": "Badge 状态标签",
+      "implementation": ["components/badge.js", "components/shared.css"],
+      "examples": [
+        {
+          "id": "default",
+          "name": "进行中",
+          "entries": {
+            "desktop": {
+              "path": "showcases/badge.html"
+            },
+            "mobile": {
+              "path": "showcases/badge.html"
+            }
+          }
+        },
+        {
+          "id": "success",
+          "name": "已完成",
+          "entries": {
+            "desktop": {
+              "path": "showcases/badge.html",
+              "query": {
+                "state": "success"
+              }
+            },
+            "mobile": {
+              "path": "showcases/badge.html",
+              "query": {
+                "state": "success"
+              }
+            }
+          }
+        },
+        {
+          "id": "neutral",
+          "name": "待开始",
+          "entries": {
+            "desktop": {
+              "path": "showcases/badge.html",
+              "query": {
+                "state": "neutral"
+              }
+            },
+            "mobile": {
+              "path": "showcases/badge.html",
+              "query": {
+                "state": "neutral"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "project-card",
+      "name": "Project Card 项目卡片",
+      "implementation": [
+        "components/project-card.js",
+        "components/badge.js",
+        "components/shared.css"
+      ],
+      "examples": [
+        {
+          "id": "default",
+          "name": "进行中",
+          "entries": {
+            "desktop": {
+              "path": "showcases/project-card.html"
+            },
+            "mobile": {
+              "path": "showcases/project-card.html"
+            }
+          }
+        },
+        {
+          "id": "new",
+          "name": "待开始",
+          "entries": {
+            "desktop": {
+              "path": "showcases/project-card.html",
+              "query": {
+                "state": "new"
+              }
+            },
+            "mobile": {
+              "path": "showcases/project-card.html",
+              "query": {
+                "state": "new"
+              }
+            }
+          }
+        },
+        {
+          "id": "completed",
+          "name": "已完成",
+          "entries": {
+            "desktop": {
+              "path": "showcases/project-card.html",
+              "query": {
+                "state": "completed"
+              }
+            },
+            "mobile": {
+              "path": "showcases/project-card.html",
+              "query": {
+                "state": "completed"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "dialog",
+      "name": "Dialog 创建项目",
+      "implementation": [
+        "components/dialog.js",
+        "components/button.js",
+        "components/input.js",
+        "components/shared.css"
+      ],
+      "examples": [
+        {
+          "id": "default",
+          "name": "关闭",
+          "entries": {
+            "desktop": {
+              "path": "showcases/dialog.html"
+            },
+            "mobile": {
+              "path": "showcases/dialog.html"
+            }
+          }
+        },
+        {
+          "id": "open",
+          "name": "展开",
+          "entries": {
+            "desktop": {
+              "path": "showcases/dialog.html",
+              "query": {
+                "state": "open"
+              }
+            },
+            "mobile": {
+              "path": "showcases/dialog.html",
+              "query": {
+                "state": "open"
+              }
+            }
+          }
+        },
+        {
+          "id": "error",
+          "name": "校验错误",
+          "entries": {
+            "desktop": {
+              "path": "showcases/dialog.html",
+              "query": {
+                "state": "error"
+              }
+            },
+            "mobile": {
+              "path": "showcases/dialog.html",
+              "query": {
+                "state": "error"
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "tokens": [
+    {
+      "id": "primary",
+      "name": "品牌主色",
+      "group": "颜色",
+      "type": "color",
+      "value": "#4f46e5",
+      "description": "主按钮、链接和选中状态。",
+      "cssVariable": "--color-primary"
+    },
+    {
+      "id": "primary-hover",
+      "name": "品牌悬停",
+      "group": "颜色",
+      "type": "color",
+      "value": "#4338ca",
+      "description": "主按钮在悬停时加深。",
+      "cssVariable": "--color-primary-hover"
+    },
+    {
+      "id": "primary-soft",
+      "name": "品牌浅底",
+      "group": "颜色",
+      "type": "color",
+      "value": "#f0eefb",
+      "description": "选中导航、焦点周边与辅助面板。",
+      "cssVariable": "--color-primary-soft"
+    },
+    {
+      "id": "on-primary",
+      "name": "品牌色上文字",
+      "group": "颜色",
+      "type": "color",
+      "value": "#ffffff",
+      "description": "主按钮上的高对比文字。",
+      "cssVariable": "--color-on-primary"
+    },
+    {
+      "id": "ink",
+      "name": "正文颜色",
+      "group": "颜色",
+      "type": "color",
+      "value": "#202333",
+      "description": "标题及主要正文。",
+      "cssVariable": "--color-ink"
+    },
+    {
+      "id": "muted",
+      "name": "辅助文字",
+      "group": "颜色",
+      "type": "color",
+      "value": "#626b7c",
+      "description": "提示、元数据和次级说明。",
+      "cssVariable": "--color-muted"
+    },
+    {
+      "id": "surface",
+      "name": "画布底色",
+      "group": "颜色",
+      "type": "color",
+      "value": "#f7f8fc",
+      "description": "应用内容区的安静底色。",
+      "cssVariable": "--color-surface"
+    },
+    {
+      "id": "card",
+      "name": "卡片底色",
+      "group": "颜色",
+      "type": "color",
+      "value": "#ffffff",
+      "description": "卡片、输入框与导航的底色。",
+      "cssVariable": "--color-card"
+    },
+    {
+      "id": "border",
+      "name": "分隔边框",
+      "group": "颜色",
+      "type": "color",
+      "value": "#e1e5ed",
+      "description": "组件边界、分隔线与输入框。",
+      "cssVariable": "--color-border"
+    },
+    {
+      "id": "success",
+      "name": "成功状态",
+      "group": "颜色",
+      "type": "color",
+      "value": "#287157",
+      "description": "完成任务和保存成功的反馈。",
+      "cssVariable": "--color-success"
+    },
+    {
+      "id": "danger",
+      "name": "错误状态",
+      "group": "颜色",
+      "type": "color",
+      "value": "#b32938",
+      "description": "字段校验与需要注意的错误。",
+      "cssVariable": "--color-danger"
+    },
+    {
+      "id": "focus",
+      "name": "焦点轮廓",
+      "group": "颜色",
+      "type": "color",
+      "value": "#aaa3ef",
+      "description": "键盘导航时可见的焦点轮廓。",
+      "cssVariable": "--color-focus"
+    },
+    {
+      "id": "body",
+      "name": "正文字号",
+      "group": "字体",
+      "type": "typography",
+      "value": "16px",
+      "description": "页面与组件共用的基础字号。",
+      "cssVariable": "--font-body"
+    },
+    {
+      "id": "space",
+      "name": "基础间距",
+      "group": "间距",
+      "type": "spacing",
+      "value": "8px",
+      "description": "布局采用基础间距的倍数。",
+      "cssVariable": "--space"
+    },
+    {
+      "id": "radius",
+      "name": "控件圆角",
+      "group": "形状",
+      "type": "radius",
+      "value": "8px",
+      "description": "按钮和输入框的统一圆角。",
+      "cssVariable": "--radius"
+    },
+    {
+      "id": "radius-card",
+      "name": "卡片圆角",
+      "group": "形状",
+      "type": "radius",
+      "value": "12px",
+      "description": "项目卡片与内容面板的圆角。",
+      "cssVariable": "--radius-card"
+    },
+    {
+      "id": "shadow-card",
+      "name": "卡片浮起",
+      "group": "阴影",
+      "type": "shadow",
+      "value": "0 8px 24px #2023330a",
+      "description": "悬停和弹出反馈的柔和阴影。",
+      "cssVariable": "--shadow-card"
+    }
+  ]
+}

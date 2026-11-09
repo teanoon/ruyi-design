@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.uxai-review/
+*.tgz
+test-results/
+playwright-report/
+.npm-cache/
+
+# Local client, harness and credential state
+.agents/
+.codex/
+.codex-home/
+.aws/
+.project.yaml

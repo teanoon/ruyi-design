@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>按钮示例</title>
+    <link rel="stylesheet" href="../components/shared.css" />
+  </head>
+  <body class="showcase">
+    <p class="showcase-label">BUTTON / PRIMARY ACTION</p>
+    <div class="example" id="example"></div>
+    <p class="showcase-result" id="result" role="status"></p>
+    <script type="module">
+      import { createButton } from "../components/button.js";
+      document
+        .querySelector("#example")
+        .append(
+          createButton({
+            label: "保存更改",
+            state:
+              new URLSearchParams(location.search).get("state") ?? "default",
+            onClick: () =>
+              (document.querySelector("#result").textContent = "更改已保存"),
+          }),
+        );
+    </script>
+  </body>
+</html>

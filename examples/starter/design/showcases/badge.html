@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>状态标签</title>
+    <link rel="stylesheet" href="../components/shared.css" />
+  </head>
+  <body class="showcase">
+    <p class="showcase-label">BADGE / PROJECT STATUS</p>
+    <div id="example"></div>
+    <script type="module">
+      import { createBadge } from "../components/badge.js";
+      const state =
+        new URLSearchParams(location.search).get("state") ?? "default";
+      const tone = state === "default" ? "progress" : state;
+      document
+        .querySelector("#example")
+        .append(
+          createBadge({
+            label: { progress: "进行中", success: "已完成", neutral: "待开始" }[
+              tone
+            ],
+            tone,
+          }),
+        );
+    </script>
+  </body>
+</html>

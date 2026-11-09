@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>项目卡片</title>
+    <link rel="stylesheet" href="../components/shared.css" />
+  </head>
+  <body class="showcase">
+    <p class="showcase-label">PROJECT CARD / SHARED WITH PAGES</p>
+    <div class="example" id="example"></div>
+    <script type="module">
+      import {
+        createProjectCard,
+        projects,
+      } from "../components/project-card.js";
+      const state =
+        new URLSearchParams(location.search).get("state") ?? "default";
+      const project = { ...projects[0] };
+      if (state === "new")
+        Object.assign(project, {
+          progress: 0,
+          tasks: "0 / 5",
+          status: "待开始",
+          statusTone: "neutral",
+          tone: "peach",
+        });
+      if (state === "completed")
+        Object.assign(project, {
+          progress: 100,
+          tasks: "25 / 25",
+          status: "已完成",
+          statusTone: "success",
+          tone: "mint",
+        });
+      document
+        .querySelector("#example")
+        .append(
+          createProjectCard({
+            project,
+            onOpen: () =>
+              (document.querySelector("#result").textContent =
+                "已选择：" + project.name),
+          }),
+        );
+    </script>
+    <p class="showcase-result" id="result" role="status"></p>
+  </body>
+</html>

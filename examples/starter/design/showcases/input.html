@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>输入框示例</title>
+    <link rel="stylesheet" href="../components/shared.css" />
+  </head>
+  <body class="showcase">
+    <p class="showcase-label">INPUT / TEXT ENTRY</p>
+    <div class="example" id="example"></div>
+    <script type="module">
+      import { createInput } from "../components/input.js";
+      const state = new URLSearchParams(location.search).get("state");
+      document
+        .querySelector("#example")
+        .append(
+          createInput({
+            error: state === "error" ? "请输入有效的邮箱地址" : "",
+            placeholder: "you@studio.design",
+            value:
+              state === "filled"
+                ? "xiaoman@studio.design"
+                : state === "error"
+                  ? "xiaoman@"
+                  : "",
+            disabled: state === "disabled",
+            hint: state === "error" ? "" : "我们只会发送与你的工作有关的消息。",
+          }),
+        );
+      if (state === "focus") document.querySelector("input").focus();
+    </script>
+  </body>
+</html>

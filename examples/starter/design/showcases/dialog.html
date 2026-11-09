@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>创建项目弹窗</title>
+    <link rel="stylesheet" href="../components/shared.css" />
+  </head>
+  <body class="showcase">
+    <p class="showcase-label">DIALOG / CREATE PROJECT</p>
+    <div id="example"></div>
+    <p class="showcase-result" id="result" role="status"></p>
+    <script type="module">
+      import { createProjectDialog } from "../components/dialog.js";
+      import { createButton } from "../components/button.js";
+      const dialog = createProjectDialog({
+        onCreate: (name) =>
+          (document.querySelector("#result").textContent = "已创建：" + name),
+      });
+      document.body.append(dialog);
+      document
+        .querySelector("#example")
+        .append(
+          createButton({
+            label: "新建项目",
+            onClick: () => dialog.showModal(),
+          }),
+        );
+      const state = new URLSearchParams(location.search).get("state");
+      if (state === "open" || state === "error") dialog.showModal();
+      if (state === "error") dialog.querySelector("form").requestSubmit();
+      window.uxaiReviewState = {
+        exportState: () => ({ open: dialog.open }),
+        restoreState: (s) => {
+          if (s.open && !dialog.open) dialog.showModal();
+        },
+      };
+    </script>
+  </body>
+</html>
