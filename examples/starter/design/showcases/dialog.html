@@ -29,7 +29,7 @@
       const state = new URLSearchParams(location.search).get("state");
       if (state === "open" || state === "error") dialog.showModal();
       if (state === "error") dialog.querySelector("form").requestSubmit();
-      window.uxaiReviewState = {
+      window.ruyiDesignReviewState = {
         exportState: () => ({ open: dialog.open }),
         restoreState: (s) => {
           if (s.open && !dialog.open) dialog.showModal();

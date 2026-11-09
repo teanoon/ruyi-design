@@ -12,3 +12,7 @@ playwright-report/
 .codex-home/
 .aws/
 .project.yaml
+
+.ruyi-uxai/
+
+.ruyi-design/

@@ -1,4 +1,6 @@
 import path from "node:path";
+import { publicationSchema, type PublicationInput } from "../../contracts/publication.js";
+import { resolveDataRoot } from "./data-root.js";
 import { randomUUID } from "node:crypto";
 import { realpath, rm } from "node:fs/promises";
 import { Store } from "../../storage/index.js";
@@ -56,7 +58,7 @@ export class ReviewSession {
       "outside_project",
       "designRoot must be inside projectRoot",
     );
-    const data = path.resolve(dataRoot ?? path.join(p, ".uxai-review"));
+    const data = resolveDataRoot(p, dataRoot).path;
     ensure(
       !data.startsWith(d + path.sep) && data !== d,
       "invalid_data_root",
@@ -121,77 +123,55 @@ export class ReviewSession {
         "Unknown page/state/device or component example",
       );
   }
-  async publish(
-    input: {
-      batchId: string;
-      leaseToken: string;
-      idempotencyKey: string;
-      expectedBaseRevision: string;
-    },
-    validate: (revision: Revision) => Promise<void>,
-  ) {
-    const previous = this.store
-      .all<Revision>("revision")
-      .find((r) => r.key === input.idempotencyKey);
+  private ensureNoActiveFeedback() {
+    this.feedback.recover();
+    ensure(!this.store.all<Batch>("batch").some(b => b.status === "queued" || b.status === "processing"),
+      "feedback_active", "Finish or release queued/processing feedback before publishing a conversation request", 409);
+  }
+  async publish(input: PublicationInput, validate: (revision: Revision) => Promise<void>) {
+    const args = publicationSchema.parse(input);
+    const conversation = args.source === "conversation";
+    const previous = this.store.all<Revision>("revision").find(r => r.key === args.idempotencyKey);
     if (previous) {
-      ensure(
-        previous.batchId === input.batchId,
-        "key_conflict",
-        "Publication key belongs to another batch",
-        409,
-      );
+      const sameSource = (previous.source ?? "feedback") === args.source;
+      const sameRequest = conversation
+        ? previous.request === args.request && previous.baseRevision === args.expectedBaseRevision
+        : previous.batchId === args.batchId;
+      ensure(sameSource && sameRequest, "key_conflict", "Publication key belongs to another request or batch", 409);
       return previous;
     }
-    ensure(
-      !this.publishing,
-      "publish_busy",
-      "Another publication is running",
-      409,
-    );
-    const b = this.feedback.lease(input.batchId, input.leaseToken);
-    ensure(
-      this.active()?.id === input.expectedBaseRevision,
-      "stale_revision",
-      "Reload current revision before publishing",
-      409,
-    );
-    ensure(
-      b.items.every((item) =>
-        this.feedback.comment(item.id).results.some((r) => r.batchId === b.id),
-      ),
-      "missing_results",
-      "Record a result and scope for every batch item before publishing",
-    );
+    ensure(!this.publishing, "publish_busy", "Another publication is running", 409);
+    if (conversation) this.ensureNoActiveFeedback();
+    const batch = conversation ? undefined : this.feedback.lease(args.batchId!, args.leaseToken!);
+    ensure(this.active()?.id === args.expectedBaseRevision, "stale_revision", "Reload current revision before publishing", 409);
+    if (batch) ensure(batch.items.every(item => this.feedback.comment(item.id).results.some(r => r.batchId === batch.id)),
+      "missing_results", "Record a result and scope for every batch item before publishing");
     this.publishing = true;
     let revision: Revision | undefined;
     try {
       revision = await snapshot(this.designRoot, this.dataRoot);
       await validate(revision);
-      this.feedback.lease(input.batchId, input.leaseToken);
+      if (conversation) this.ensureNoActiveFeedback();
+      else this.feedback.lease(args.batchId!, args.leaseToken!);
+      ensure(this.active()?.id === args.expectedBaseRevision, "stale_revision", "Active revision changed during validation", 409);
       revision.mode = changeMode(this.active()!, revision);
-      revision.key = input.idempotencyKey;
-      revision.batchId = input.batchId;
+      revision.key = args.idempotencyKey;
+      revision.source = args.source;
+      revision.baseRevision = args.expectedBaseRevision;
+      if (conversation) revision.request = args.request;
+      else revision.batchId = args.batchId;
       const rev = revision;
       this.store.transaction(() => {
         this.store.put("revision", rev);
         this.store.put("meta", { id: "active", revisionId: rev.id });
-        this.feedback.published(input.batchId, rev.id);
-        this.store.event("revision.published", {
-          revisionId: rev.id,
-          mode: rev.mode,
-        });
+        if (batch) this.feedback.published(batch.id, rev.id);
+        this.store.event("revision.published", { revisionId: rev.id, mode: rev.mode, source: rev.source });
       });
       return rev;
-    } catch (e) {
-      if (revision)
-        await rm(path.join(this.dataRoot, "revisions", revision.id), {
-          recursive: true,
-          force: true,
-        });
-      throw e;
-    } finally {
-      this.publishing = false;
-    }
+    } catch (error) {
+      if (revision) await rm(path.join(this.dataRoot, "revisions", revision.id), { recursive: true, force: true });
+      throw error;
+    } finally { this.publishing = false; }
   }
   close() {
     if (!this.closed) {

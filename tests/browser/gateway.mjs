@@ -125,8 +125,8 @@ try {
     assert.equal(new URL(page.url()).searchParams.get("id"), "login");
     assert.equal(await page.getByLabel("状态", { exact: true }).inputValue(), "default");
     assert.equal(await page.getByLabel("设备", { exact: true }).inputValue(), "desktop");
-    await frame.locator("[data-uxai-overlay]").waitFor({ state: "visible" });
-    const highlight = await frame.locator("[data-uxai-overlay]").boundingBox();
+    await frame.locator("[data-ruyi-design-overlay]").waitFor({ state: "visible" });
+    const highlight = await frame.locator("[data-ruyi-design-overlay]").boundingBox();
     const target = await frame.getByRole("button", { name: "登录工作空间" }).boundingBox();
     assert(Math.abs(highlight.x - target.x) < 2 && Math.abs(highlight.y - target.y) < 2);
   }
@@ -155,7 +155,7 @@ try {
   await page.getByText("已切换到评论对应的设计并定位元素。", { exact: true }).waitFor();
   assert.equal(new URL(page.url()).searchParams.get("id"), "button");
   assert.equal(await page.locator("iframe").count(), 4);
-  await frame.locator("[data-uxai-overlay]").waitFor({ state: "visible" });
+  await frame.locator("[data-ruyi-design-overlay]").waitFor({ state: "visible" });
   const original = app.session.context().comments[0].target;
   app.session.feedback.add("Removed element feedback", {
     ...original,
@@ -164,7 +164,7 @@ try {
   await page.reload();
   await page.locator(".comment-card").filter({ hasText: "Removed element feedback" }).getByRole("button", { name: "定位", exact: true }).click();
   await page.getByText("定位已失效或存在歧义，保留原版本评论上下文。", { exact: true }).waitFor();
-  assert.equal(await frame.locator("[data-uxai-overlay]").isVisible(), false);
+  assert.equal(await frame.locator("[data-ruyi-design-overlay]").isVisible(), false);
   console.log(
     "Gateway preview passed: routing query, rewritten Host/Origin, opaque-frame modules, saved element feedback without submission or agent monitoring, navigation.",
   );

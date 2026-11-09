@@ -65,10 +65,11 @@ describe("prototype catalog", () => {
     }
   });
   it("validates the bridge envelope", () => {
+    expect(isBridgeMessage({ version: 1, channel: "uxai-review", frameId: "x", type: "ready" })).toBe(false);
     expect(
       isBridgeMessage({
         version: 1,
-        channel: "uxai-review",
+        channel: "ruyi-design",
         frameId: "x",
         type: "ready",
       }),
@@ -76,7 +77,7 @@ describe("prototype catalog", () => {
     expect(
       isBridgeMessage({
         version: 2,
-        channel: "uxai-review",
+        channel: "ruyi-design",
         frameId: "x",
         type: "ready",
       }),

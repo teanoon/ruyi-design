@@ -8,7 +8,7 @@ The review URL initially contains a high-entropy fragment credential. The workbe
 
 The management listener checks Host, Origin and bearer identity. The preview listener checks Host and serves only approved snapshot assets. Path normalization and realpath checks reject traversal and symlink escapes. Scripts can run in prototype iframes, but the management origin exposes no wildcard CORS or shared-host cookie credential.
 
-Source files remain under the configured design root. `.uxai-review/` holds the SQLite database, process lock and revision snapshots. Keep this directory outside the design root and out of version control. A data directory cannot be attached to a different project. Only one process owns it at a time; stale locks may be reclaimed when the owning process no longer exists.
+Source files remain under the configured design root. `.ruyi-design/` (or a reused legacy `.ruyi-uxai/` / `.uxai-review/`) holds the SQLite database, process lock and revision snapshots. Keep this directory outside the design root and out of version control. A data directory cannot be attached to a different project. Only one process owns it at a time; stale locks may be reclaimed when the owning process no longer exists.
 
 All published versions and comments are retained in v0.1; there is no automatic deletion of referenced historical revisions. Failed, unpublished candidates are removed. To discard a review, stop the service and back up or explicitly delete its data directory. Deleting it loses comments and version history, not source designs. Future database versions are rejected rather than silently downgraded.
 

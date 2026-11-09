@@ -85,9 +85,9 @@ try {
     await page.getByRole("button", { name: "创建项目", exact: true }).click();
     await page.getByRole("link", { name: "验收新项目", exact: true }).waitFor();
     assert.equal(await page.locator(".project-card").count(), 4);
-    const dashboardState=await page.evaluate(()=>window.uxaiReviewState.exportState());
+    const dashboardState=await page.evaluate(()=>window.ruyiDesignReviewState.exportState());
     await page.reload();
-    await page.evaluate(state=>window.uxaiReviewState.restoreState(state),dashboardState);
+    await page.evaluate(state=>window.ruyiDesignReviewState.restoreState(state),dashboardState);
     await page.getByRole('link',{name:'验收新项目',exact:true}).waitFor();
     await page.getByRole("link", { name: "产品体验升级", exact: true }).click();
     await page
@@ -106,9 +106,9 @@ try {
     await page.getByRole("link", { name: "通知偏好", exact: true }).click();
     await page.locator("#digest").uncheck();
     assert(!(await page.locator("#digest").isChecked()));
-    const settingsState=await page.evaluate(()=>window.uxaiReviewState.exportState());
+    const settingsState=await page.evaluate(()=>window.ruyiDesignReviewState.exportState());
     await page.reload();
-    await page.evaluate(state=>window.uxaiReviewState.restoreState(state),settingsState);
+    await page.evaluate(state=>window.ruyiDesignReviewState.restoreState(state),settingsState);
     assert(!(await page.locator('#digest').isChecked()));
     await page.goto(url("pages/home.html"));
     await page.screenshot({

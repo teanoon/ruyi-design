@@ -14,6 +14,7 @@ export type Comment = {
     | "needs_clarification"
     | "awaiting_review"
     | "resolved";
+  resolution?: "confirmed" | "archived";
   previousDraft?: { text: string; status: Comment["status"] };
   thread: { author: string; text: string; at: number }[];
   results: {
@@ -233,7 +234,7 @@ export class Feedback {
       return b;
     });
   }
-  review(id: string, action: "resolve" | "reopen" | "reply", message = "") {
+  review(id: string, action: "resolve" | "archive" | "reopen" | "reply", message = "") {
     return this.store.transaction(() => {
       const c = this.comment(id);
       if (message.trim())
@@ -246,6 +247,19 @@ export class Feedback {
           409,
         );
         c.status = "resolved";
+        c.resolution = "confirmed";
+      }
+      if (action === "archive") {
+        ensure(
+          !this.store.all<Batch>("batch").some(b =>
+            (b.status === "queued" || b.status === "processing") && b.items.some(item => item.id === id)),
+          "batch_active",
+          "Wait until the current batch is released or published before archiving",
+          409,
+        );
+        c.status = "resolved";
+        c.resolution = "archived";
+        delete c.previousDraft;
       }
       if (action === "reopen") {
         ensure(

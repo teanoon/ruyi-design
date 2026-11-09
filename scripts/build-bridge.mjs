@@ -6,7 +6,7 @@ await build({
     emptyOutDir: true,
     lib: {
       entry: "src/browser/bridge/index.ts",
-      name: "UXAIReviewBridge",
+      name: "RuyiDesignReviewBridge",
       formats: ["iife"],
       fileName: () => "bridge.js",
     },

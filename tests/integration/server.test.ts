@@ -132,13 +132,19 @@ describe("HTTP workspace and revisions", () => {
       await rm(root, { recursive: true, force: true });
     }
   });
-  it("installs skills explicitly, is idempotent and preserves user edits", async () => {
+  it.each(["prototype-review", "ruyi-uxai-review"])("installs explicitly and preserves legacy %s customization", async (legacyName) => {
     const root = await mkdtemp(path.join(os.tmpdir(), "uxai-setup-"));
     try {
-      expect((await setup(root)).written).toBeGreaterThan(0);
+      const legacy = path.join(root, ".agents/skills", legacyName);
+      await mkdir(legacy, { recursive: true });
+      await writeFile(path.join(legacy, "custom.md"), "keep user customization");
+      const installed = await setup(root);
+      expect(installed.written).toBeGreaterThan(0);
+      expect(installed.legacySkillPath).toBe(legacy);
+      expect(await readFile(path.join(legacy, "custom.md"), "utf8")).toBe("keep user customization");
       expect((await setup(root)).written).toBe(0);
       await writeFile(
-        path.join(root, ".agents/skills/prototype-review/SKILL.md"),
+        path.join(root, ".agents/skills/ruyi-design-review/SKILL.md"),
         "user edits",
       );
       await expect(setup(root)).rejects.toThrow("differs");
@@ -152,7 +158,7 @@ describe("HTTP workspace and revisions", () => {
       path.join(os.tmpdir(), "uxai-setup-outside-"),
     );
     try {
-      const skill = path.join(root, ".agents/skills/prototype-review");
+      const skill = path.join(root, ".agents/skills/ruyi-design-review");
       await mkdir(skill, { recursive: true });
       await symlink(outside, path.join(skill, "references"));
       await expect(setup(root)).rejects.toThrow("symlink");

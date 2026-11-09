@@ -1,3 +1,5 @@
+import type { PublicationInput } from "../contracts/publication.js";
+import { BRAND } from "../contracts/brand.js";
 import Fastify, { type FastifyInstance } from "fastify";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -83,7 +85,7 @@ export class ReviewServer {
       reviewUrl: review.href,
       previewUrl: this.previewBase,
       revisionId: this.session.active()!.id,
-      guideUri: "uxai://guides/prototype-review",
+      guideUri: BRAND.guideUri,
     };
   }
   private async listen(o: StartOptions) {
@@ -122,7 +124,7 @@ export class ReviewServer {
       // Only requests multiplexed through the public gateway need URL rewriting.
       // Internal candidate validation must load resources from the local listener.
       const gatewayRequest = this.gatewayPreview &&
-        req.headers["x-uxai-gateway-preview"] === "1";
+        req.headers["x-ruyi-design-gateway-preview"] === "1";
       const params = req.params as { revision: string; "*": string };
       ensure(
         /^[\w-]+$/.test(params.revision),
@@ -150,7 +152,7 @@ export class ReviewServer {
         const bridgePath = gatewayRequest
           ? "/_preview/bridge.js"
           : "/bridge.js";
-        const injection = `<script>window.__UXAI_CONFIG__=${config}</script><script src="${bridgePath}"></script>`;
+        const injection = `<script>window.${BRAND.configGlobal}=${config}</script><script src="${bridgePath}"></script>`;
         body = html.includes("</head>")
           ? html.replace("</head>", `${injection}</head>`)
           : injection + html;
@@ -206,7 +208,7 @@ export class ReviewServer {
           url: req.url.replace(/^\/_preview/, ""),
           headers: {
             host: new URL(this.internalPreviewBase).host,
-            "x-uxai-gateway-preview": "1",
+            "x-ruyi-design-gateway-preview": "1",
           },
         });
         // ES modules inside an opaque sandbox use Origin: null. Only public
@@ -240,7 +242,7 @@ export class ReviewServer {
     this.control.post(`${prefix}/comments/:id/review`, async (req) => {
       const b = z
         .object({
-          action: z.enum(["resolve", "reopen", "reply"]),
+          action: z.enum(["resolve", "archive", "reopen", "reply"]),
           message: z.string().max(20000).default(""),
         })
         .parse(req.body);
@@ -329,12 +331,7 @@ export class ReviewServer {
       "Workbench and preview must have different origins",
     );
   }
-  async publish(input: {
-    batchId: string;
-    leaseToken: string;
-    idempotencyKey: string;
-    expectedBaseRevision: string;
-  }) {
+  async publish(input: PublicationInput) {
     return this.session.publish(input, async (revision) => {
       this.candidates.set(revision.id, revision);
       try {

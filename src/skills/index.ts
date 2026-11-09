@@ -8,10 +8,11 @@ import {
 } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { BRAND } from "../contracts/brand.js";
 import { ensure } from "../core/errors.js";
 
 export const packageRoot = fileURLToPath(new URL("../../", import.meta.url));
-export const skillRoot = path.join(packageRoot, "skills/prototype-review");
+export const skillRoot = path.join(packageRoot, "skills", BRAND.skill);
 export async function guide() {
   return readFile(path.join(skillRoot, "SKILL.md"), "utf8");
 }
@@ -28,12 +29,12 @@ async function files(root: string, dir = ""): Promise<string[]> {
 }
 export async function setup(project: string) {
   const root = await realpath(project),
-    dest = path.join(root, ".agents/skills/prototype-review");
+    dest = path.join(root, ".agents/skills/ruyi-design-review");
   // Check every existing ancestor before writing; setup must not follow project symlinks.
   for (const part of [
     ".agents",
     ".agents/skills",
-    ".agents/skills/prototype-review",
+    ".agents/skills/ruyi-design-review",
   ]) {
     try {
       ensure(
@@ -85,9 +86,17 @@ export async function setup(project: string) {
     await mkdir(path.dirname(p.file), { recursive: true });
     await writeFile(p.file, p.body, { flag: "wx" });
   }
+  const legacySkillPaths: string[] = [];
+  for (const name of ["ruyi-uxai-review", "prototype-review"]) {
+    const legacy = path.join(root, ".agents/skills", name);
+    if (await lstat(legacy).catch(() => undefined)) legacySkillPaths.push(legacy);
+  }
   return {
     skillPath: dest,
     written: pending.length,
-    mcpCommand: "npx uxai-review mcp",
+    mcpCommand: `${BRAND.cli} mcp`,
+    legacySkillPath: legacySkillPaths[0],
+    legacySkillPaths,
+    ...(legacySkillPaths.length ? { migration: "Review and disable the reported legacy skills after switching to ruyi-design-review; custom files are preserved." } : {}),
   };
 }

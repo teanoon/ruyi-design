@@ -1,6 +1,6 @@
 # Northstar Starter
 
-一个可以独立运行、也可以通过 UXAI Review 评审的团队协作原型。所有数据均为本地示例；登录、发送邮件、保存资料和创建项目用于体验交互，不连接真实后端。
+一个可以独立运行、也可以通过 如意设计 · Ruyi Design 评审的团队协作原型。所有数据均为本地示例；登录、发送邮件、保存资料和创建项目用于体验交互，不连接真实后端。
 
 原型位于 `design/`，由共享的 CSS 令牌和 JavaScript 组件组成，无需构建、无远程字体或图片依赖。
 
@@ -15,9 +15,9 @@
 
 ## 在本项目中评审
 
-本仓库的 `.codex/config.toml` 已配置 `uxai_review`，项目技能位于 `.agents/skills/prototype-review/`。重新加载 Codex 的 MCP 连接后发送：
+本仓库的 `.codex/config.toml` 已配置 `ruyi_design`，项目技能位于 `.agents/skills/ruyi-design-review/`。重新加载 Codex 的 MCP 连接后发送：
 
-> 使用 prototype-review，启动本项目 examples/starter/design 的评审站点，给我预览链接。
+> 使用 ruyi-design-review，启动本项目 examples/starter/design 的评审站点，给我预览链接。
 
 保存评论后，在对话中发送：
 
@@ -25,7 +25,7 @@
 
 页面无需提交，智能体不会持续监听；每次只处理你主动要求的一轮，之后新增的评论留待下一次通知。
 
-工具参数应使用当前仓库的绝对 `projectRoot` 与 `examples/starter/design` 的绝对 `designRoot`。运行数据默认位于仓库的 `.uxai-review/`，与设计资产分开。
+工具参数应使用当前仓库的绝对 `projectRoot` 与 `examples/starter/design` 的绝对 `designRoot`。本仓库继续原地使用既有 `.uxai-review/`；新项目默认使用 `.ruyi-design/`，均与设计资产分开。
 
 ## 值得体验的交互
 

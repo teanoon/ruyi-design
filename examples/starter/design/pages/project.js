@@ -178,7 +178,7 @@ mountShell({
   content,
 });
 render();
-window.uxaiReviewState = {
+window.ruyiDesignReviewState = {
   exportState: () => ({
     selected,
     tasks: tasks.map((t) => ({ id: t.id, done: t.done })),

@@ -1,0 +1,42 @@
+:root {
+  /* Primitive */
+  --jade-700: #255644;
+  --jade-600: #2f6b58;
+  --jade-100: #e8f0e9;
+  --paper-50: #f7f5ef;
+  --white: #ffffff;
+  --ink-900: #263c32;
+  --ink-600: #647267;
+  --wood-600: #8e603e;
+  --stone-200: #d8e1d7;
+  --stone-500: #7b8e80;
+  /* Semantic */
+  --color-primary: var(--jade-600);
+  --color-primary-hover: var(--jade-700);
+  --color-primary-soft: var(--jade-100);
+  --color-canvas: var(--paper-50);
+  --color-surface: var(--white);
+  --color-text: var(--ink-900);
+  --color-muted: var(--ink-600);
+  --color-line: var(--stone-200);
+  --color-control-line: var(--stone-500);
+  --color-focus: var(--jade-600);
+  --color-wood: var(--wood-600);
+  --color-history-bg: #fff8e6;
+  --color-history-text: #78500b;
+  --color-history-line: #b77912;
+  --color-success: var(--jade-600);
+  --color-danger: #a33a36;
+  --color-deletion: #96600f;
+  /* Component */
+  --brand: var(--color-primary);
+  --line: var(--color-line);
+  --muted: var(--color-muted);
+  --button-primary-bg: var(--color-primary);
+  --button-primary-hover: var(--color-primary-hover);
+  --navigation-active-bg: var(--color-primary-soft);
+  --panel-bg: var(--color-surface);
+  --control-border: var(--color-control-line);
+  --radius-control: 8px;
+  --radius-panel: 12px;
+}

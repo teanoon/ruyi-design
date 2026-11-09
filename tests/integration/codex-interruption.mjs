@@ -42,11 +42,11 @@ async function run(prompt, onEvent) {
     "-c",
     "sandbox_workspace_write.network_access=true",
     "-c",
-    `mcp_servers.uxai_test.command=${JSON.stringify(process.execPath)}`,
+    `mcp_servers.ruyi_design_test.command=${JSON.stringify(process.execPath)}`,
     "-c",
-    `mcp_servers.uxai_test.args=${JSON.stringify([cli, "mcp"])}`,
+    `mcp_servers.ruyi_design_test.args=${JSON.stringify([cli, "mcp"])}`,
     "-c",
-    "mcp_servers.uxai_test.required=true",
+    "mcp_servers.ruyi_design_test.required=true",
     prompt,
   ];
   const child = spawn("codex", args, { stdio: ["ignore", "pipe", "pipe"] });
@@ -96,9 +96,9 @@ try {
     interrupted = false,
     draftId;
   await run(
-    `Bounded integration test. Use only uxai_test MCP tools. Do not edit files or run shell commands. Start review with projectRoot ${root} and designRoot ${root}/design, then read get_review_context. The test driver saves a comment and interrupts this session after startup; do not monitor or prepare an update.`,
+    `Bounded integration test. Use only ruyi_design_test MCP tools. Do not edit files or run shell commands. Start review with projectRoot ${root} and designRoot ${root}/design, then read ruyi_design_get_review_context. The test driver saves a comment and interrupts this session after startup; do not monitor or prepare an update.`,
     async (e, child) => {
-      if (e.type === "item.completed" && e.item.tool === "start_review") {
+      if (e.type === "item.completed" && e.item.tool === "ruyi_design_start_review") {
         info = findInfo(e.item.result);
         assert(info);
         const url = new URL(info.reviewUrl),
@@ -134,18 +134,18 @@ try {
     "Did not interrupt the real client after saving a comment",
   );
   const resumed = await run(
-    `Bounded integration test. Use only uxai_test MCP tools, no edits or shell. Start review with projectRoot ${root} and designRoot ${root}/design. Read get_review_context, verify the draft comment ID ${draftId} and revision ${info.revisionId} survived the earlier client interruption. Then call end_review and report the result.`,
+    `Bounded integration test. Use only ruyi_design_test MCP tools, no edits or shell. Start review with projectRoot ${root} and designRoot ${root}/design. Read ruyi_design_get_review_context, verify the draft comment ID ${draftId} and revision ${info.revisionId} survived the earlier client interruption. Then call ruyi_design_end_review and report the result.`,
     async () => {},
   );
   assert.equal(resumed.code, 0);
   assert(
     resumed.events.some(
-      (e) => e.type === "item.completed" && e.tool === "get_review_context",
+      (e) => e.type === "item.completed" && e.tool === "ruyi_design_get_review_context",
     ),
   );
   assert(
     resumed.events.some(
-      (e) => e.type === "item.completed" && e.tool === "end_review",
+      (e) => e.type === "item.completed" && e.tool === "ruyi_design_end_review",
     ),
   );
   console.log(

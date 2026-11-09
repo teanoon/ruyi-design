@@ -24,7 +24,7 @@ export function gatewayJavaScript(source: string, base: string) {
     sourceType: "module",
     allowReturnOutsideFunction: true,
   });
-  let helper = "__uxaiGatewayRoute";
+  let helper = "__ruyiDesignGatewayRoute";
   while (source.includes(helper)) helper += "_";
   const edits: { start: number; end: number; text: string }[] = [];
   const wrap = (node: any, module = false) =>

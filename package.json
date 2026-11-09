@@ -1,14 +1,14 @@
 {
-  "name": "uxai-review",
+  "name": "@littlehobby/ruyi-design",
   "version": "0.1.0",
-  "description": "Local HTML prototype review workspace and MCP server",
+  "description": "如意设计 · Ruyi Design — local interactive prototype preview and review",
   "type": "module",
   "license": "UNLICENSED",
   "engines": {
     "node": ">=24.0.0"
   },
   "bin": {
-    "uxai-review": "dist/cli/index.js"
+    "ruyi-design": "dist/cli/index.js"
   },
   "files": [
     "dist",
@@ -29,7 +29,13 @@
     "test:gateway": "node tests/browser/gateway.mjs",
     "preview:starter": "node scripts/preview-starter.mjs",
     "prepack": "npm run build",
-    "test:deleted": "node tests/browser/deleted.mjs"
+    "test:deleted": "node tests/browser/deleted.mjs",
+    "test:brand": "node tests/integration/brand-mcp.mjs && node tests/browser/brand.mjs",
+    "preview:design": "node scripts/preview-design.mjs",
+    "test:design": "node tests/browser/product-design.mjs",
+    "test:editing": "node tests/browser/review-editing.mjs",
+    "test:archive": "node tests/browser/archive.mjs",
+    "test:conversation": "node tests/browser/conversation.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",

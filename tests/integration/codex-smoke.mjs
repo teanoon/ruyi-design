@@ -18,12 +18,12 @@ try {
       comment = seed.session.feedback.add(`User-requested round ${round}`, { kind: "token", objectId: "primary", revisionId: seed.info().revisionId });
       assert.equal(seed.session.context().batches.filter((b) => b.status === "queued").length, 0);
     } finally { await seed.close(); }
-    const prompt = `I have saved review comments; please update from comment ${comment.id}. This is a bounded MCP communication test: use only uxai_test tools, no source edits or shell commands. Start review with projectRoot ${root} and designRoot ${root}/design, read get_review_context, call prepare_update once with commentIds ["${comment.id}"] and key codex-update-${round}, claim with owner codex-smoke and key codex-claim-${round}, read get_feedback_context, record needs_clarification with message "Integration test received", release the batch, then end_review. Do not monitor, poll, process other comments or start another round. Stop if a tool fails.`;
+    const prompt = `I have saved review comments; please update from comment ${comment.id}. This is a bounded MCP communication test: use only ruyi_design_test tools, no source edits or shell commands. Start review with projectRoot ${root} and designRoot ${root}/design, read ruyi_design_get_review_context, call ruyi_design_prepare_update once with commentIds ["${comment.id}"] and key codex-update-${round}, claim with owner codex-smoke and key codex-claim-${round}, read ruyi_design_get_feedback_context, record needs_clarification with message "Integration test received", release the batch, then ruyi_design_end_review. Do not monitor, poll, process other comments or start another round. Stop if a tool fails.`;
     const args = ["exec", "--ignore-user-config", "--ephemeral", "--skip-git-repo-check", "--json", "-C", root,
       "-c", 'approval_policy="never"', "-c", 'sandbox_mode="workspace-write"', "-c", "sandbox_workspace_write.network_access=true",
-      "-c", `mcp_servers.uxai_test.command=${JSON.stringify(process.execPath)}`,
-      "-c", `mcp_servers.uxai_test.args=${JSON.stringify([cli, "mcp"])}`,
-      "-c", "mcp_servers.uxai_test.required=true", prompt];
+      "-c", `mcp_servers.ruyi_design_test.command=${JSON.stringify(process.execPath)}`,
+      "-c", `mcp_servers.ruyi_design_test.args=${JSON.stringify([cli, "mcp"])}`,
+      "-c", "mcp_servers.ruyi_design_test.required=true", prompt];
     const child = spawn("codex", args, { stdio: ["ignore", "pipe", "pipe"] });
     let buffer = "", stderr = "";
     const events = [];
@@ -45,8 +45,8 @@ try {
       const code = await new Promise((resolve, reject) => { child.on("error", reject); child.on("close", resolve); });
       reports.push({ round, code, events, stderr: stderr.slice(-1500) });
       assert.equal(code, 0);
-      for (const tool of ["start_review", "get_review_context", "prepare_update", "claim_batch", "get_feedback_context", "update_feedback", "end_review"]) assert(events.some((e) => e.tool === tool), tool);
-      assert.equal(events.filter((e) => e.tool === "prepare_update").length, 1);
+      for (const tool of ["ruyi_design_start_review", "ruyi_design_get_review_context", "ruyi_design_prepare_update", "ruyi_design_claim_batch", "ruyi_design_get_feedback_context", "ruyi_design_update_feedback", "ruyi_design_end_review"]) assert(events.some((e) => e.tool === tool), tool);
+      assert.equal(events.filter((e) => e.tool === "ruyi_design_prepare_update").length, 1);
       assert(!events.some((e) => e.tool === "wait_for_feedback"));
       assert(events.every((e) => e.status === "completed"));
     } finally { clearTimeout(timer); clearTimeout(hard); child.kill("SIGTERM"); }

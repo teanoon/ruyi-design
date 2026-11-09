@@ -22,12 +22,12 @@ Tokens have `id`, `name`, `group`, `type`, `value`, `description` and optionally
 
 Use shared CSS and ES modules for components, with `data-review-id` on stable interactive/visual elements. Page component associations assist agent impact analysis, but are not a complete static dependency graph. Page-level exceptions can remain local.
 
-The service injects a version-1 bridge into HTML responses and leaves source HTML unchanged. Bridge envelopes contain `channel: uxai-review`, `version: 1`, `frameId`, `type`, and optional payload. Parent and iframe check origin, window source and frame identity. Component examples run in separate iframes.
+The service injects a version-1 bridge into HTML responses and leaves source HTML unchanged. Bridge envelopes contain `channel: ruyi-design`, `version: 1`, `frameId`, `type`, and optional payload. Parent and iframe check origin, window source and frame identity. Component examples run in separate iframes.
 
 Optional custom restoration:
 
 ```js
-window.uxaiReviewState = {
+window.ruyiDesignReviewState = {
   exportState() {
     return { dialogOpen: document.querySelector("dialog").open };
   },
@@ -40,3 +40,5 @@ window.uxaiReviewState = {
 Only return JSON-serializable, non-sensitive state. Default capture covers URL, scroll, safe stable-ID/name form fields and focus; password, hidden and file fields are excluded. If restoration cannot reliably locate an element, it reports failure instead of guessing.
 
 Snapshots include public HTML/CSS/JS/JSON, common images/fonts and video formats. Hidden files and `node_modules` are excluded. All prototype dependencies should reside under the design root. Browser validation checks every declared page/device and component example/device entry and fails on resource errors or JS exceptions.
+
+Compatibility: use the first available API in this order: `window.ruyiDesignReviewState`, `window.ruyiUxaiReviewState`, `window.uxaiReviewState`. Each capture or restore calls only that API once. Immutable historical snapshots are not rewritten.

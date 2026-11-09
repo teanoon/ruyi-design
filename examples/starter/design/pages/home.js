@@ -201,7 +201,7 @@ mountShell({
   content,
 });
 renderProjects();
-window.uxaiReviewState = {
+window.ruyiDesignReviewState = {
   exportState: () => ({
     filter,
     query,

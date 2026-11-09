@@ -23,7 +23,7 @@ const call = async (name, args) => {
 };
 try {
   await client.connect(transport);
-  const info = await call("start_review", { projectRoot: root, designRoot: design });
+  const info = await call("ruyi_design_start_review", { projectRoot: root, designRoot: design });
   const sid = { sessionId: info.sessionId };
   browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
@@ -35,12 +35,12 @@ try {
   await page.getByLabel("评论内容").fill("删除说明");
   await page.getByRole("button", { name: "保存评论", exact: true }).click();
   await page.getByText("1 条评论待处理", { exact: true }).waitFor();
-  const batch = await call("prepare_update", { ...sid, idempotencyKey: "delete" });
-  const lease = await call("claim_batch", { ...sid, batchId: batch.id, owner: "test", idempotencyKey: "claim" });
+  const batch = await call("ruyi_design_prepare_update", { ...sid, idempotencyKey: "delete" });
+  const lease = await call("ruyi_design_claim_batch", { ...sid, batchId: batch.id, owner: "test", idempotencyKey: "claim" });
   await writeFile(path.join(design, "index.html"), html.replace('<span data-review-id="remove-me">将被删除的说明</span>', ''));
-  await call("update_feedback", { ...sid, batchId: batch.id, leaseToken: lease.leaseToken, action: "modified", commentId: batch.items[0].id, message: "已删除说明", scope: "instance" });
-  const revision = await call("publish_revision", { ...sid, batchId: batch.id, leaseToken: lease.leaseToken, idempotencyKey: "publish", expectedBaseRevision: info.revisionId });
-  await call("set_feedback_location", { ...sid, commentId: batch.items[0].id, revisionId: revision.id, location: { kind: "deleted", container: { selector: "#actions", tag: "DIV" } } });
+  await call("ruyi_design_update_feedback", { ...sid, batchId: batch.id, leaseToken: lease.leaseToken, action: "modified", commentId: batch.items[0].id, message: "已删除说明", scope: "instance" });
+  const revision = await call("ruyi_design_publish_revision", { ...sid, batchId: batch.id, leaseToken: lease.leaseToken, idempotencyKey: "publish", expectedBaseRevision: info.revisionId });
+  await call("ruyi_design_set_feedback_location", { ...sid, commentId: batch.items[0].id, revisionId: revision.id, location: { kind: "deleted", container: { selector: "#actions", tag: "DIV" } } });
   await page.getByText("版本 " + revision.id.slice(0, 8), { exact: true }).waitFor();
   // Reload once to ensure the comment's newly recorded location is loaded.
   await page.reload();
@@ -49,7 +49,7 @@ try {
   await frame().getByText("此处已删除", { exact: true }).waitFor();
   assert.equal(await frame().getByText("将被删除的说明", { exact: true }).count(), 0);
   const box = await frame().locator("#actions").boundingBox();
-  const overlay = await frame().locator("[data-uxai-overlay]").boundingBox();
+  const overlay = await frame().locator("[data-ruyi-design-overlay]").boundingBox();
   assert(Math.abs(box.x - overlay.x) < 2 && Math.abs(box.width - overlay.width) < 2);
   await page.getByRole("button", { name: "查看原版本", exact: true }).click();
   await page.getByText("已在原版本中定位元素。", { exact: true }).waitFor();
@@ -64,11 +64,11 @@ try {
     body: JSON.stringify({ text: "Another requested update", target: { kind: "page", objectId: "settings", stateId: "default", deviceId: "desktop", revisionId: revision.id } }),
   });
   assert(saved.ok);
-  const second = await call("prepare_update", { ...sid, idempotencyKey: "second" });
-  const secondLease = await call("claim_batch", { ...sid, batchId: second.id, owner: "test", idempotencyKey: "second-claim" });
-  await call("update_feedback", { ...sid, batchId: second.id, leaseToken: secondLease.leaseToken, action: "modified", commentId: second.items[0].id, message: "Updated title", scope: "instance" });
+  const second = await call("ruyi_design_prepare_update", { ...sid, idempotencyKey: "second" });
+  const secondLease = await call("ruyi_design_claim_batch", { ...sid, batchId: second.id, owner: "test", idempotencyKey: "second-claim" });
+  await call("ruyi_design_update_feedback", { ...sid, batchId: second.id, leaseToken: secondLease.leaseToken, action: "modified", commentId: second.items[0].id, message: "Updated title", scope: "instance" });
   await writeFile(path.join(design, "index.html"), html.replace('<span data-review-id="remove-me">将被删除的说明</span>', '').replace('<h1>设置</h1>', '<h1>最新设置</h1>'));
-  const latest = await call("publish_revision", { ...sid, batchId: second.id, leaseToken: secondLease.leaseToken, idempotencyKey: "second-publish", expectedBaseRevision: revision.id });
+  const latest = await call("ruyi_design_publish_revision", { ...sid, batchId: second.id, leaseToken: secondLease.leaseToken, idempotencyKey: "second-publish", expectedBaseRevision: revision.id });
   await page.getByText("新版本已发布，可返回最新版本查看；当前保留原版本对照。", { exact: true }).waitFor();
   assert((await page.locator("iframe").getAttribute("src")).includes(info.revisionId));
   assert.equal(new URL(page.url()).searchParams.get("revision"), info.revisionId);
@@ -79,12 +79,12 @@ try {
   await frame().getByRole("button", { name: "保存更改", exact: true }).waitFor();
   assert.equal(await frame().getByText("将被删除的说明", { exact: true }).count(), 0);
   assert.equal(await page.locator("#history-banner").isVisible(), false);
-  const final = await call("get_review_context", sid);
+  const final = await call("ruyi_design_get_review_context", sid);
   assert.equal(final.revision.id, latest.id);
   assert.equal(final.comments[0].target.revisionId, info.revisionId);
   assert.equal(final.comments[0].status, "awaiting_review");
   assert.deepEqual(errors, []);
-  await call("end_review", sid);
+  await call("ruyi_design_end_review", sid);
   console.log("Deletion review passed: explicit parent marker, original immutable snapshot, current-version return, original target and human review preserved.");
 } finally {
   await browser?.close();

@@ -82,7 +82,7 @@ document.querySelector("#recovery-form").onsubmit = (e) => {
       ? "重置指引已准备好，请检查你的邮箱。"
       : "请先填写有效的邮箱地址。";
 };
-window.uxaiReviewState = {
+window.ruyiDesignReviewState = {
   exportState: () => ({
     recoveryOpen: recovery.open,
     message: document.querySelector("#feedback").textContent,

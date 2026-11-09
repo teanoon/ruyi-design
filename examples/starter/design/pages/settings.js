@@ -159,7 +159,7 @@ function render() {
   panel.append(form);
 }
 render();
-window.uxaiReviewState = {
+window.ruyiDesignReviewState = {
   exportState: () => ({
     active,
     preferences,

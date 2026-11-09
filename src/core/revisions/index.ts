@@ -56,6 +56,9 @@ export type Revision = {
   hashes: Record<string, string>;
   created: number;
   batchId?: string;
+  source?: "feedback" | "conversation";
+  request?: string;
+  baseRevision?: string;
   key?: string;
   mode: "styles" | "reload";
 };

@@ -73,6 +73,38 @@ describe("durable review workflow", () => {
       expect(f.comment(c.id).status).toBe("submitted");
       expect(() => f.review(c.id, "resolve")).toThrow("published changes");
     }));
+  it("lets users archive unaddressed work and reopened drafts without claiming a verified fix", () =>
+    fixture((store, feedback) => {
+      const comment = feedback.add("Keep as is", target);
+      const batch = feedback.prepare("archive-unaddressed");
+      expect(() => feedback.review(comment.id, "archive")).toThrow("current batch");
+      const claim = feedback.claim(batch.id, "agent", "archive-claim");
+      expect(() => feedback.review(comment.id, "archive")).toThrow("current batch");
+      feedback.update(batch.id, claim.leaseToken!, "unaddressed", comment.id, "User requested no change", "instance");
+      store.transaction(() => feedback.published(batch.id, "v2"));
+      const before = structuredClone(feedback.comment(comment.id));
+      const archived = feedback.review(comment.id, "archive");
+      expect(archived.status).toBe("resolved");
+      expect(archived.resolution).toBe("archived");
+      expect(archived.results).toEqual(before.results);
+      expect(archived.target).toEqual(before.target);
+      expect(store.get<import("../../src/core/feedback/index.js").Batch>("batch", batch.id)!.status).toBe("completed");
+      feedback.review(comment.id, "reopen");
+      feedback.edit(comment.id, "Reopened, still no change needed");
+      expect(feedback.review(comment.id, "archive").resolution).toBe("archived");
+      expect(feedback.comment(comment.id).text).toBe("Reopened, still no change needed");
+      expect(feedback.comment(comment.id).previousDraft).toBeUndefined();
+      expect(feedback.review(comment.id, "archive").status).toBe("resolved");
+    }));
+  it("lets a user archive a fresh draft without generating an agent result", () =>
+    fixture((store, feedback) => {
+      const comment = feedback.add("Withdraw this idea", target);
+      const archived = feedback.review(comment.id, "archive");
+      expect(archived.status).toBe("resolved");
+      expect(archived.resolution).toBe("archived");
+      expect(archived.results).toEqual([]);
+      expect(store.all("batch")).toEqual([]);
+    }));
   it("freezes user-requested updates, deduplicates retry, and leaves new comments for later", () =>
     fixture((s, f) => {
       const c = f.add("Fix padding", target);

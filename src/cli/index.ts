@@ -5,6 +5,8 @@ import { chromium } from "playwright";
 import { setup, packageRoot } from "../skills/index.js";
 import { loadCatalog } from "../core/catalog/index.js";
 import path from "node:path";
+import { BRAND } from "../contracts/brand.js";
+import { resolveDataRoot } from "../core/sessions/data-root.js";
 
 try {
   const { values, positionals } = parseArgs({
@@ -32,6 +34,9 @@ try {
     );
   } else if (command === "doctor") {
     const result: any = {
+      product: `${BRAND.product} · ${BRAND.englishName}`,
+      package: BRAND.packageName,
+      data: resolveDataRoot(path.resolve(values.project ?? process.cwd())),
       node: process.version,
       workspace: existsSync(
         path.join(packageRoot, "dist/workspace/index.html"),
@@ -53,7 +58,7 @@ try {
       process.exitCode = 1;
   } else
     console.log(
-      "UXAI Review\n\nuxai-review mcp\nuxai-review setup --client codex --project <root>\nuxai-review doctor [--design <directory>]",
+      `${BRAND.product} · ${BRAND.englishName}\n${BRAND.signature} · ${BRAND.tagline}\n\n${BRAND.cli} mcp\n${BRAND.cli} setup --client codex --project <root>\n${BRAND.cli} doctor [--project <root>] [--design <directory>]`,
     );
 } catch (e: any) {
   console.error(e.message);

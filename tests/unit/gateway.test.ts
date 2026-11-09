@@ -25,7 +25,7 @@ it("rewrites actual imports and navigations without treating comments as code", 
   expect(transformed).toContain("components/a.js?port=4173");
   expect(transformed).toContain("// import x from './not-a-module.js'");
   expect(transformed).toContain("do not replace ./copy.js");
-  expect(transformed).toContain("import(__uxaiGatewayRoute");
+  expect(transformed).toContain("import(__ruyiDesignGatewayRoute");
   expect(gatewayJavaScript(`xhr.open('GET', './mock.json'); custom.open('panel');`,base)).toBe(`xhr.open('GET', './mock.json'); custom.open('panel');`);
 });
 it("routes CSS imports, images and HTML module entries explicitly", () => {

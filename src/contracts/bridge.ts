@@ -1,9 +1,12 @@
+import { BRAND } from "./brand.js";
 export const BRIDGE_VERSION = 1;
 export type BridgeMessage = {
   version: 1;
-  channel: "uxai-review";
+  channel: typeof BRAND.bridgeChannel;
   frameId: string;
   type:
+    | "measure"
+    | "resize"
     | "ready"
     | "mode"
     | "selection"
@@ -21,9 +24,11 @@ export function isBridgeMessage(value: unknown): value is BridgeMessage {
   const m = value as BridgeMessage;
   return (
     m.version === 1 &&
-    m.channel === "uxai-review" &&
+    m.channel === BRAND.bridgeChannel &&
     typeof m.frameId === "string" &&
     [
+      "measure",
+      "resize",
       "ready",
       "mode",
       "selection",

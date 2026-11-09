@@ -1,0 +1,651 @@
+{
+  "schemaVersion": 1,
+  "id": "ruyi-design-product",
+  "name": "如意设计 · 产品设计稿",
+  "devices": [
+    {
+      "id": "desktop",
+      "name": "桌面",
+      "width": 1280,
+      "height": 900
+    },
+    {
+      "id": "mobile",
+      "name": "手机",
+      "width": 390,
+      "height": 844
+    }
+  ],
+  "pages": [
+    {
+      "id": "workbench",
+      "name": "设计工作区",
+      "components": [
+        "button",
+        "comment",
+        "navigation",
+        "revision",
+        "selector",
+        "brand"
+      ],
+      "states": [
+        {
+          "id": "default",
+          "name": "元素评论模式",
+          "entries": {
+            "desktop": {
+              "path": "pages/workbench.html",
+              "query": {
+                "state": "default"
+              }
+            },
+            "mobile": {
+              "path": "pages/workbench.html",
+              "query": {
+                "state": "default"
+              }
+            }
+          }
+        },
+        {
+          "id": "commenting",
+          "name": "添加评论",
+          "entries": {
+            "desktop": {
+              "path": "pages/workbench.html",
+              "query": {
+                "state": "commenting"
+              }
+            },
+            "mobile": {
+              "path": "pages/workbench.html",
+              "query": {
+                "state": "commenting"
+              }
+            }
+          }
+        },
+        {
+          "id": "preview",
+          "name": "交互预览",
+          "entries": {
+            "desktop": {
+              "path": "pages/workbench.html",
+              "query": {
+                "state": "preview"
+              }
+            },
+            "mobile": {
+              "path": "pages/workbench.html",
+              "query": {
+                "state": "preview"
+              }
+            }
+          }
+        },
+        {
+          "id": "updated",
+          "name": "新版待复核",
+          "entries": {
+            "desktop": {
+              "path": "pages/workbench.html",
+              "query": {
+                "state": "updated"
+              }
+            },
+            "mobile": {
+              "path": "pages/workbench.html",
+              "query": {
+                "state": "updated"
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "components": [
+    {
+      "id": "button",
+      "name": "按钮",
+      "implementation": [
+        "components/ui.js",
+        "components/styles.css"
+      ],
+      "examples": [
+        {
+          "id": "default",
+          "name": "默认",
+          "entries": {
+            "desktop": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "button",
+                "state": "default"
+              }
+            },
+            "mobile": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "button",
+                "state": "default"
+              }
+            }
+          }
+        },
+        {
+          "id": "loading",
+          "name": "保存中",
+          "entries": {
+            "desktop": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "button",
+                "state": "loading"
+              }
+            },
+            "mobile": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "button",
+                "state": "loading"
+              }
+            }
+          }
+        },
+        {
+          "id": "disabled",
+          "name": "禁用",
+          "entries": {
+            "desktop": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "button",
+                "state": "disabled"
+              }
+            },
+            "mobile": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "button",
+                "state": "disabled"
+              }
+            }
+          }
+        },
+        {
+          "id": "success",
+          "name": "已保存",
+          "entries": {
+            "desktop": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "button",
+                "state": "success"
+              }
+            },
+            "mobile": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "button",
+                "state": "success"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "comment",
+      "name": "评论卡片",
+      "implementation": [
+        "components/ui.js",
+        "components/styles.css"
+      ],
+      "examples": [
+        {
+          "id": "default",
+          "name": "待处理",
+          "entries": {
+            "desktop": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "comment",
+                "state": "default"
+              }
+            },
+            "mobile": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "comment",
+                "state": "default"
+              }
+            }
+          }
+        },
+        {
+          "id": "selected",
+          "name": "已定位",
+          "entries": {
+            "desktop": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "comment",
+                "state": "selected"
+              }
+            },
+            "mobile": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "comment",
+                "state": "selected"
+              }
+            }
+          }
+        },
+        {
+          "id": "review",
+          "name": "待复核",
+          "entries": {
+            "desktop": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "comment",
+                "state": "review"
+              }
+            },
+            "mobile": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "comment",
+                "state": "review"
+              }
+            }
+          }
+        },
+        {
+          "id": "archived",
+          "name": "已归档",
+          "entries": {
+            "desktop": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "comment",
+                "state": "archived"
+              }
+            },
+            "mobile": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "comment",
+                "state": "archived"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "navigation",
+      "name": "页面导航",
+      "implementation": [
+        "components/ui.js",
+        "components/styles.css"
+      ],
+      "examples": [
+        {
+          "id": "default",
+          "name": "默认",
+          "entries": {
+            "desktop": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "navigation",
+                "state": "default"
+              }
+            },
+            "mobile": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "navigation",
+                "state": "default"
+              }
+            }
+          }
+        },
+        {
+          "id": "selected",
+          "name": "选中页面",
+          "entries": {
+            "desktop": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "navigation",
+                "state": "selected"
+              }
+            },
+            "mobile": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "navigation",
+                "state": "selected"
+              }
+            }
+          }
+        },
+        {
+          "id": "preview",
+          "name": "预览中",
+          "entries": {
+            "desktop": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "navigation",
+                "state": "preview"
+              }
+            },
+            "mobile": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "navigation",
+                "state": "preview"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "revision",
+      "name": "修订提示",
+      "implementation": [
+        "components/ui.js",
+        "components/styles.css"
+      ],
+      "examples": [
+        {
+          "id": "default",
+          "name": "新版待复核",
+          "entries": {
+            "desktop": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "revision",
+                "state": "default"
+              }
+            },
+            "mobile": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "revision",
+                "state": "default"
+              }
+            }
+          }
+        },
+        {
+          "id": "deleted",
+          "name": "内容已删除",
+          "entries": {
+            "desktop": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "revision",
+                "state": "deleted"
+              }
+            },
+            "mobile": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "revision",
+                "state": "deleted"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "selector",
+      "name": "设备与状态控件",
+      "implementation": [
+        "components/ui.js",
+        "components/styles.css"
+      ],
+      "examples": [
+        {
+          "id": "desktop",
+          "name": "桌面",
+          "entries": {
+            "desktop": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "selector",
+                "state": "desktop"
+              }
+            },
+            "mobile": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "selector",
+                "state": "desktop"
+              }
+            }
+          }
+        },
+        {
+          "id": "mobile",
+          "name": "手机",
+          "entries": {
+            "desktop": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "selector",
+                "state": "mobile"
+              }
+            },
+            "mobile": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "selector",
+                "state": "mobile"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "brand",
+      "name": "品牌标志",
+      "implementation": [
+        "components/ui.js",
+        "components/styles.css",
+        "assets/ruyi-mark.svg",
+        "assets/ruyi-wordmark.svg",
+        "assets/ruyi-mark-mono.svg"
+      ],
+      "examples": [
+        {
+          "id": "default",
+          "name": "最终版 · 提交墙方印",
+          "entries": {
+            "desktop": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "brand",
+                "state": "default"
+              }
+            },
+            "mobile": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "brand",
+                "state": "default"
+              }
+            }
+          }
+        },
+        {
+          "id": "compact",
+          "name": "小尺寸应用",
+          "entries": {
+            "desktop": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "brand",
+                "state": "compact"
+              }
+            },
+            "mobile": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "brand",
+                "state": "compact"
+              }
+            }
+          }
+        },
+        {
+          "id": "mono",
+          "name": "单色适配",
+          "entries": {
+            "desktop": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "brand",
+                "state": "mono"
+              }
+            },
+            "mobile": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "brand",
+                "state": "mono"
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "tokens": [
+    {
+      "id": "primary",
+      "name": "玉绿主色",
+      "group": "颜色",
+      "type": "color",
+      "value": "#2f6b58",
+      "cssVariable": "--color-primary",
+      "description": "主操作、选中和普通定位。"
+    },
+    {
+      "id": "primary-soft",
+      "name": "玉绿浅底",
+      "group": "颜色",
+      "type": "color",
+      "value": "#e8f0e9",
+      "cssVariable": "--color-primary-soft",
+      "description": "选中导航及反馈背景。"
+    },
+    {
+      "id": "canvas",
+      "name": "暖白画布",
+      "group": "颜色",
+      "type": "color",
+      "value": "#f7f5ef",
+      "cssVariable": "--color-canvas",
+      "description": "衬托设计稿的工具画布。"
+    },
+    {
+      "id": "surface",
+      "name": "白色面板",
+      "group": "颜色",
+      "type": "color",
+      "value": "#ffffff",
+      "cssVariable": "--color-surface",
+      "description": "导航、评论和组件表面。"
+    },
+    {
+      "id": "text",
+      "name": "墨绿正文",
+      "group": "颜色",
+      "type": "color",
+      "value": "#263c32",
+      "cssVariable": "--color-text",
+      "description": "主要文字与标题。"
+    },
+    {
+      "id": "muted",
+      "name": "辅助文字",
+      "group": "颜色",
+      "type": "color",
+      "value": "#647267",
+      "cssVariable": "--color-muted",
+      "description": "说明、时间和上下文。"
+    },
+    {
+      "id": "wood",
+      "name": "木色署名",
+      "group": "颜色",
+      "type": "color",
+      "value": "#8e603e",
+      "cssVariable": "--color-wood",
+      "description": "小爱好出品的温润点缀。"
+    },
+    {
+      "id": "warning",
+      "name": "历史与删除",
+      "group": "语义",
+      "type": "color",
+      "value": "#78500b",
+      "cssVariable": "--color-warning",
+      "description": "历史对照与删除提示，搭配文案和虚线。"
+    },
+    {
+      "id": "danger",
+      "name": "错误提示",
+      "group": "语义",
+      "type": "color",
+      "value": "#a33a36",
+      "cssVariable": "--color-danger",
+      "description": "连接与表单错误。"
+    },
+    {
+      "id": "body",
+      "name": "正文字号",
+      "group": "字体",
+      "type": "typography",
+      "value": "14px",
+      "cssVariable": "--font-body",
+      "description": "工具界面文字基准。"
+    },
+    {
+      "id": "space",
+      "name": "基础间距",
+      "group": "间距",
+      "type": "spacing",
+      "value": "8px",
+      "cssVariable": "--space",
+      "description": "空间节奏以 4/8px 倍数组织。"
+    },
+    {
+      "id": "radius-control",
+      "name": "控件圆角",
+      "group": "形状",
+      "type": "radius",
+      "value": "8px",
+      "cssVariable": "--radius-control",
+      "description": "按钮、表单和选择器。"
+    },
+    {
+      "id": "radius-panel",
+      "name": "面板圆角",
+      "group": "形状",
+      "type": "radius",
+      "value": "12px",
+      "cssVariable": "--radius-panel",
+      "description": "画布和内容面板。"
+    }
+  ]
+}

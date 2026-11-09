@@ -1,3 +1,4 @@
+import { BRAND } from "../../contracts/brand.js";
 import "../styles/workspace.css";
 import { isBridgeMessage, type BridgeMessage } from "../../contracts/bridge.js";
 import { routedUrl } from "../../contracts/urls.js";
@@ -18,10 +19,13 @@ function apiUrl(route: string) {
   return routedUrl(base.href, `api/sessions/${session}/${route}`).href;
 }
 let token = new URLSearchParams(location.hash.slice(1)).get("token") ?? "";
-const tokenKey = `uxai-review:${session}:token`;
+const tokenKey = `${BRAND.tokenNamespace}:${session}:token`;
 try {
   if (token) sessionStorage.setItem(tokenKey, token);
-  else token = sessionStorage.getItem(tokenKey) ?? "";
+  else {
+    token = sessionStorage.getItem(tokenKey) ?? sessionStorage.getItem(`ruyi-uxai:${session}:token`) ?? sessionStorage.getItem(`uxai-review:${session}:token`) ?? "";
+    if (token) sessionStorage.setItem(tokenKey, token);
+  }
 } catch {
   // Browsers may disable storage. Keep a supplied token in the URL so reload works.
 }
@@ -36,6 +40,7 @@ let historicalRevision: any;
 const displayedRevision = () => historicalRevision ?? context.revision;
 let selection: Target | undefined;
 let editing: string | undefined;
+let activeCommentId: string | undefined;
 let mode = "element";
 let cursor = 0;
 let connected = false;
@@ -56,14 +61,19 @@ type Frame = {
   target: Target;
   entry: any;
   ready: boolean;
+  height: number;
+  resize?: () => void;
   restore?: any;
   capture?: (value: any) => void;
   locate?: any;
 };
 const frames = new Map<string, Frame>();
 let locateTimer: ReturnType<typeof setTimeout> | undefined;
-function notice(text: string) {
-  el("notice").textContent = text;
+function notice(text: string, tone: "info" | "error" | "warning" = "info") {
+  const node = el("notice");
+  node.textContent = text;
+  node.dataset.tone = tone;
+  node.setAttribute("role", tone === "error" ? "alert" : "status");
 }
 async function api(route: string, body?: unknown, method?: string) {
   const r = await fetch(apiUrl(route), {
@@ -87,7 +97,7 @@ const button = (
   b.textContent = text;
   b.className = className;
   b.onclick = () => {
-    Promise.resolve(fn()).catch((e) => notice(e.message));
+    Promise.resolve(fn()).catch((e) => notice(e.message, "error"));
   };
   return b;
 };
@@ -95,7 +105,7 @@ function message(frame: Frame, type: BridgeMessage["type"], payload?: any) {
   frame.element.contentWindow?.postMessage(
     {
       version: 1,
-      channel: "uxai-review",
+      channel: BRAND.bridgeChannel,
       frameId: frame.element.name,
       type,
       payload,
@@ -171,7 +181,7 @@ function frameCard(entry: any, target: Target, name: string, restore?: any) {
   heading.className = "card-heading";
   heading.textContent = name;
   const dims = document.createElement("span");
-  dims.textContent = `${device.width} × ${device.height}`;
+  dims.textContent = target.kind === "component" ? `${device.width}px 宽 · 高度自适应` : `${device.width} × ${device.height}`;
   heading.append(dims);
   card.append(heading);
   const fit = document.createElement("div");
@@ -202,17 +212,20 @@ function frameCard(entry: any, target: Target, name: string, restore?: any) {
     target,
     entry,
     ready: false,
+    height: device.height,
     restore,
   });
   fit.append(iframe);
   card.append(fit);
   el("canvas").append(card);
-  new ResizeObserver(() => {
+  const resize = () => {
     if (!fit.isConnected) return;
     const scale = Math.min(1, fit.clientWidth / device.width);
     iframe.style.transform = `scale(${scale})`;
-    fit.style.height = device.height * scale + "px";
-  }).observe(fit);
+    fit.style.height = (frames.get(iframe.name)?.height ?? device.height) * scale + "px";
+  };
+  frames.get(iframe.name)!.resize = resize;
+  new ResizeObserver(resize).observe(fit);
 }
 function renderCanvas(restores = new Map<string, any>()) {
   clearTimeout(locateTimer);
@@ -241,7 +254,7 @@ function renderCanvas(restores = new Map<string, any>()) {
   devices.value = view.device;
   devices.disabled = view.kind === "tokens";
   el("eyebrow").textContent =
-    view.kind === "page" ? "PAGES / PROTOTYPE" : "DESIGN SYSTEM";
+    view.kind === "page" ? "页面设计" : "设计系统";
   if (view.kind === "tokens") {
     el("title").textContent = "设计令牌";
     const grid = document.createElement("div");
@@ -330,13 +343,25 @@ function renderCanvas(restores = new Map<string, any>()) {
     frameCard(c.entry, target, c.name, restores.get(c.name));
   }
 }
+function placeComposer() {
+  const composer = el("composer");
+  for (const card of document.querySelectorAll<HTMLElement>("#comments .comment-card")) { card.classList.remove("editing"); card.classList.toggle("selected", card.dataset.commentId === activeCommentId); }
+  const id = editing?.replace(/^reply:/, "");
+  const card = [...document.querySelectorAll<HTMLElement>("#comments .comment-card")].find(c => c.dataset.commentId === id);
+  if (card && !composer.hidden) {
+    card.classList.add("editing");
+    card.querySelector(".comment-actions")!.before(composer);
+  } else el("comments").before(composer);
+}
 function compose(target: Target, comment?: any) {
   selection = structuredClone(target);
   editing = comment?.id;
+  activeCommentId = comment?.id;
   el("composer").hidden = false;
   el("target-label").textContent =
     `${target.kind} / ${target.objectId}${target.stateId ? " / " + target.stateId : ""}${target.exampleId ? " / " + target.exampleId : ""}`;
   el<HTMLTextAreaElement>("comment-text").value = comment?.text ?? "";
+  placeComposer();
   el("comment-text").focus();
 }
 async function locateComment(comment: any, original = false) {
@@ -348,7 +373,7 @@ async function locateComment(comment: any, original = false) {
     (c.kind === "page" ? c.stateId === target.stateId : c.exampleId === target.exampleId),
   );
   if (!combo) {
-    notice("评论对应的页面、状态或设备已不存在，原版本上下文仍保留。");
+    notice("评论对应的页面、状态或设备已不存在，原版本上下文仍保留。", "warning");
     return;
   }
   historicalRevision = original ? revision : undefined;
@@ -372,7 +397,7 @@ async function locateComment(comment: any, original = false) {
   f.locate = { ...(target.context?.anchor as object ?? {}), ...(deletion ? { deletion } : {}) };
   f.element.scrollIntoView({ block: "center" });
   notice("正在打开评论对应的设计并定位元素…");
-  locateTimer = setTimeout(() => notice("设计尚未完成定位，请重试；原评论上下文仍保留。"), 10000);
+  locateTimer = setTimeout(() => notice("设计尚未完成定位，请重试；原评论上下文仍保留。", "warning"), 10000);
 }
 function locateInFrame(f: Frame) {
   if (!f.locate) return;
@@ -384,8 +409,9 @@ function renderComments() {
   const list = el("comments");
   const existingArchive = list.querySelector<HTMLDetailsElement>("#archived-comments");
   if (existingArchive) archiveOpen = existingArchive.open;
+  list.before(el("composer"));
   list.replaceChildren();
-  const comments = context.comments as any[];
+  const comments = [...context.comments].reverse() as any[];
   const active = comments.filter((c) => c.status !== "resolved");
   const archived = comments.filter((c) => c.status === "resolved");
   el("count").textContent = String(active.length);
@@ -416,10 +442,12 @@ function renderComments() {
   };
   for (const c of comments) {
     const card = document.createElement("article");
-    card.className = "comment-card";
+    card.className = "comment-card" + (activeCommentId === c.id ? " selected" : "");
+    card.dataset.commentId = c.id;
+    card.dataset.status = c.status;
     const head = document.createElement("div");
     head.className = "comment-meta";
-    head.textContent = `${c.target.objectId} · ${c.target.deviceId ?? "令牌"} · ${statusNames[c.status]}`;
+    head.textContent = `${c.target.objectId} · ${c.target.deviceId ?? "令牌"} · ${c.status === "resolved" && c.resolution === "archived" ? "已归档" : statusNames[c.status]}`;
     const text = document.createElement("p");
     text.textContent = c.text;
     card.append(head, text);
@@ -452,6 +480,22 @@ function renderComments() {
           await refresh();
         }),
       );
+    if (c.status !== "resolved") {
+      const archiveButton = button("归档", async () => {
+        await api(`comments/${c.id}/review`, { action: "archive" });
+        if (editing?.replace(/^reply:/, "") === c.id) {
+          el("composer").hidden = true;
+          editing = undefined;
+          selection = undefined;
+        }
+        await refresh();
+      });
+      const busy = context.batches.some((b: any) =>
+        ["queued", "processing"].includes(b.status) && b.items.some((item: any) => item.id === c.id));
+      archiveButton.disabled = busy;
+      if (busy) archiveButton.title = "本轮处理完成后可以归档";
+      actions.append(archiveButton);
+    }
     if (c.status !== "draft")
       actions.append(
         button("重新打开", async () => {
@@ -463,11 +507,14 @@ function renderComments() {
       button("回复", () => {
         compose(c.target);
         editing = `reply:${c.id}`;
+        activeCommentId = c.id;
+        placeComposer();
       }),
     );
     card.append(actions);
     (c.status === "resolved" ? archiveList : activeList).append(card);
   }
+  placeComposer();
   const drafts = comments.filter((c) => c.status === "draft").length;
   el("pending-count").textContent = drafts
     ? `${drafts} 条评论待处理`
@@ -494,6 +541,7 @@ window.addEventListener("message", (e) => {
   if (!f || e.source !== f.element.contentWindow) return;
   if (m.type === "ready") {
     f.ready = true;
+    if (f.target.kind === "component") message(f, "measure");
     message(f, "mode", historicalRevision ? "experience" : mode);
     if (f.restore) {
       const restore = f.restore;
@@ -501,7 +549,33 @@ window.addEventListener("message", (e) => {
       message(f, "restore", restore);
     } else locateInFrame(f);
   }
-  if (m.type === "selection" && !historicalRevision) compose({ ...f.target, context: m.payload });
+  if (m.type === "resize" && f.target.kind === "component") {
+    const height = m.payload?.height;
+    if (typeof height === "number" && Number.isFinite(height) && height >= 160 && height <= 7680) {
+      f.height = Math.ceil(height);
+      f.element.height = String(f.height);
+      f.element.style.height = f.height + "px";
+      f.resize?.();
+    }
+  }
+  if (m.type === "selection" && !historicalRevision) {
+    const target = { ...f.target, context: m.payload };
+    const anchor = m.payload?.anchor;
+    const existing = [...context.comments].reverse().find((c: any) => {
+      const t = c.target, a = t.context?.anchor;
+      if (c.status === "resolved" || t.kind !== target.kind || t.objectId !== target.objectId || t.stateId !== target.stateId || t.deviceId !== target.deviceId || t.exampleId !== target.exampleId || !anchor?.selector || !a?.selector) return false;
+      return a.selector === anchor.selector || (a.reviewId && a.reviewId === anchor.reviewId) || anchor.ancestors?.some((p: any) => p.selector === a.selector) || a.ancestors?.some((p: any) => p.selector === anchor.selector);
+    });
+    if (existing?.status === "draft") compose(existing.target, existing);
+    else if (existing) {
+      compose(existing.target);
+      editing = `reply:${existing.id}`;
+      activeCommentId = existing.id;
+      renderComments();
+      el("comment-text").focus();
+      notice("此评论已纳入更新，可在原位补充回复。");
+    } else compose(target);
+  }
   if (m.type === "captured") {
     f.capture?.(m.payload);
     f.capture = undefined;
@@ -509,15 +583,24 @@ window.addEventListener("message", (e) => {
   if (m.type === "restored") {
     if (f.locate) locateInFrame(f);
     else if (!m.payload.ok)
-      notice("新版已发布，部分交互状态无法恢复；评论草稿已保留。");
+      notice("新版已发布，部分交互状态无法恢复；评论草稿已保留。", "warning");
   }
   if (m.type === "located") {
     clearTimeout(locateTimer);
     notice(!m.payload.ok ? "定位已失效或存在歧义，保留原版本评论上下文。"
       : m.payload.kind === "deleted" ? "已定位到保留的父容器：此处已删除。"
-      : historicalRevision ? "已在原版本中定位元素。" : "已切换到评论对应的设计并定位元素。");
+      : historicalRevision ? "已在原版本中定位元素。" : "已切换到评论对应的设计并定位元素。", !m.payload.ok ? "error" : m.payload.kind === "deleted" ? "warning" : "info");
   }
 });
+function latestAvailableView(): View {
+  const m = context.revision.manifest as Manifest;
+  if (view.kind === "tokens") return { ...view, device: m.devices.some(d => d.id === view.device) ? view.device : m.devices[0].id };
+  const all = combinations(m);
+  const current = all.find(c => c.kind === view.kind && c.objectId === view.id && c.deviceId === view.device && (c.kind !== "page" || c.stateId === view.state));
+  if (current) return view;
+  const fallback = all.find(c => c.kind === view.kind && c.objectId === view.id) ?? all[0];
+  return fallback ? { kind: fallback.kind, id: fallback.objectId, state: fallback.kind === "page" ? fallback.stateId : undefined, device: fallback.deviceId } : { kind: "tokens", id: "tokens", device: m.devices[0].id };
+}
 async function updateRevision() {
   if (historicalRevision) {
     await refresh();
@@ -542,6 +625,13 @@ async function updateRevision() {
   const old = context.revision.id;
   await refresh();
   if (old === context.revision.id) return;
+  const next = latestAvailableView();
+  if (next !== view) {
+    choose(next);
+    notice("原设计入口已移除，已切换到最新可用页面；原版本仍可查看。");
+    return;
+  }
+  renderNav();
   if (context.revision.mode === "styles" && !context.previewSandboxed) {
     for (const f of frames.values()) {
       f.target.revisionId = context.revision.id;
@@ -612,6 +702,12 @@ el("cancel-comment").onclick = () => {
   selection = undefined;
   editing = undefined;
 };
+el("comment-text").addEventListener("keydown", (e: KeyboardEvent) => {
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    el<HTMLFormElement>("composer").requestSubmit();
+  }
+});
 el("composer").onsubmit = async (e) => {
   e.preventDefault();
   try {
@@ -628,12 +724,12 @@ el("composer").onsubmit = async (e) => {
     await refresh();
     notice("评论已保存。请在 AI 对话中说：我已评论，可以更新。");
   } catch (e: any) {
-    notice(e.message);
+    notice(e.message, "error");
   }
 };
 el("return-latest").onclick = () => {
   historicalRevision = undefined;
-  choose(view);
+  choose(latestAvailableView());
   notice("已返回最新版本。");
 };
 window.onpopstate = async () => {
@@ -646,7 +742,7 @@ window.onpopstate = async () => {
     if (location.href !== requestedUrl) return;
     historicalRevision = revision;
   } catch (e: any) {
-    notice(e.message);
+    notice(e.message, "error");
     return;
   }
   view = {
@@ -685,5 +781,6 @@ async function init() {
 }
 void init().catch((e) => {
   el("activity").textContent = "工作区连接失败";
-  notice(e.message);
+  el("activity").dataset.tone = "error";
+  notice(e.message, "error");
 });

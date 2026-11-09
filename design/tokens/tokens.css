@@ -1,0 +1,16 @@
+:root {
+  /* Primitive → semantic → component */
+  --jade-700:#255644; --jade-600:#2f6b58; --jade-100:#e8f0e9;
+  --paper-50:#f7f5ef; --stone-200:#d8e1d7; --stone-500:#7b8e80;
+  --ink-900:#263c32; --ink-600:#647267; --wood-600:#8e603e;
+  --color-primary:var(--jade-600); --color-primary-hover:var(--jade-700);
+  --color-primary-soft:var(--jade-100); --color-canvas:var(--paper-50);
+  --color-surface:#fff; --color-text:var(--ink-900); --color-muted:var(--ink-600);
+  --color-line:var(--stone-200); --color-control:var(--stone-500); --color-wood:var(--wood-600);
+  --color-warning:#78500b; --color-warning-soft:#fff8e6; --color-danger:#a33a36;
+  --color-on-primary:#fff; --font-body:14px; --space:8px;
+  --radius-control:8px; --radius-panel:12px;
+  --shadow-panel:0 8px 32px #263c3208;
+  --button-bg:var(--color-primary); --button-hover:var(--color-primary-hover);
+  --nav-active:var(--color-primary-soft); --card-bg:var(--color-surface);
+}

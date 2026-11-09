@@ -1,0 +1,32 @@
+export const BRAND = {
+  product: "如意设计",
+  englishName: "Ruyi Design",
+  publisher: "LittleHobby",
+  signature: "小爱好出品",
+  tagline: "让设计，更合心意。",
+  packageName: "@littlehobby/ruyi-design",
+  cli: "ruyi-design",
+  mcpName: "ruyi-design-mcp",
+  connectionKey: "ruyi_design",
+  skill: "ruyi-design-review",
+  guideUri: "ruyi-design://guides/review",
+  bridgeChannel: "ruyi-design",
+  configGlobal: "__RUYI_DESIGN_CONFIG__",
+  tokenNamespace: "ruyi-design",
+  overlayAttribute: "data-ruyi-design-overlay",
+  dataDirectory: ".ruyi-design",
+  previousDataDirectory: ".ruyi-uxai",
+  legacyDataDirectory: ".uxai-review",
+} as const;
+
+export const BRAND_COLORS = {
+  primary: "#2F6B58",
+  primaryHover: "#255644",
+  primarySoft: "#E8F0E9",
+  canvas: "#F7F5EF",
+  surface: "#FFFFFF",
+  ink: "#263C32",
+  muted: "#647267",
+  wood: "#8E603E",
+  deletion: "#96600F",
+} as const;

@@ -1,3 +1,5 @@
+import { publicationFields } from "../contracts/publication.js";
+import { BRAND } from "../contracts/brand.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
@@ -10,10 +12,10 @@ import { feedbackLocationSchema } from "../contracts/feedback.js";
 
 export function createMcp() {
   const mcp = new McpServer(
-    { name: "uxai-review", version: "0.1.0" },
+    { name: BRAND.mcpName, version: "0.1.0" },
     {
       instructions:
-        "Read uxai://guides/prototype-review for the workflow. Start a review with explicit project paths. Saved comments never trigger work automatically. Only after the user explicitly asks to update from comments, read context, prepare_update, claim, edit repository files, record results and publish one round. Do not poll or monitor. Only the user confirms fixes.",
+        "Read ruyi-design://guides/review. Start with explicit project paths. Only explicit user requests authorize changes. For saved feedback: read context, prepare/claim a batch, edit, record results and publish. For direct requests in chat: read context, edit and publish source=conversation with the actual request and base revision in the same session; never fabricate comments or create a separate preview. Saved comments never trigger work automatically. Do not poll or monitor. Only the user confirms fixes or archives comments.",
     },
   );
   const sessions = new Map<string, ReviewServer>();
@@ -68,8 +70,8 @@ export function createMcp() {
   }
   const sid = { sessionId: z.string() };
   tool(
-    "start_review",
-    "Start the local prototype workspace. Read uxai://guides/prototype-review first.",
+    "ruyi_design_start_review",
+    "Start the local prototype workspace. Read ruyi-design://guides/review first.",
     startSchema,
     async (args) => {
       const project = await realpath(args.projectRoot),
@@ -86,14 +88,14 @@ export function createMcp() {
     },
   );
   tool(
-    "get_review_context",
+    "ruyi_design_get_review_context",
     "Read catalog, published revision, feedback and activity.",
     z.object(sid),
     (args) => session(args.sessionId).session.context(),
     true,
   );
   tool(
-    "prepare_update",
+    "ruyi_design_prepare_update",
     "Only after the user explicitly asks to update from saved comments: freeze pending comments into one immutable processing snapshot. No browser submission is needed. Retrying the same key returns the same snapshot and excludes later comments. Read context first; reuse queued work before preparing another snapshot.",
     z.object({
       ...sid,
@@ -103,7 +105,7 @@ export function createMcp() {
     (args) => session(args.sessionId).session.feedback.prepare(args.idempotencyKey, args.commentIds),
   );
   tool(
-    "claim_batch",
+    "ruyi_design_claim_batch",
     "Claim the earliest queued batch with a five-minute renewable lease.",
     z.object({
       ...sid,
@@ -119,7 +121,7 @@ export function createMcp() {
       ),
   );
   tool(
-    "get_feedback_context",
+    "ruyi_design_get_feedback_context",
     "Read fixed batch input, current thread and prototype context.",
     z.object({ ...sid, batchId: z.string(), commentId: z.string() }),
     (args) => {
@@ -137,7 +139,7 @@ export function createMcp() {
     true,
   );
   tool(
-    "update_feedback",
+    "ruyi_design_update_feedback",
     "Renew lease, reply, ask a question, release for clarification or record modified/unaddressed result and instance/component/token scope.",
     z.object({
       ...sid,
@@ -166,19 +168,13 @@ export function createMcp() {
       ),
   );
   tool(
-    "publish_revision",
-    "Validate the complete candidate and atomically publish. Record each batch result first; never resolve user feedback automatically.",
-    z.object({
-      ...sid,
-      batchId: z.string(),
-      leaseToken: z.string(),
-      idempotencyKey: z.string().min(1),
-      expectedBaseRevision: z.string(),
-    }),
+    "ruyi_design_publish_revision",
+    "Validate and atomically publish in the current session. For explicit user requests in chat use source=conversation with request, idempotencyKey and expectedBaseRevision; omit batch/lease and leave comments untouched. For saved feedback use the existing batch/lease workflow. Never fabricate comments or resolve feedback automatically.",
+    z.object({ ...sid, ...publicationFields }),
     (args) => session(args.sessionId).publish(args),
   );
   tool(
-    "set_feedback_location",
+    "ruyi_design_set_feedback_location",
     "After publishing a deletion, record the surviving parent container for that comment's modified result. Supply the published revisionId and an unambiguous container selector; never infer deletion from a failed lookup. Original comment targets remain unchanged.",
     z.object({ ...sid, commentId: z.string(), revisionId: z.string(), location: feedbackLocationSchema }),
     (args) => {
@@ -188,7 +184,7 @@ export function createMcp() {
     },
   );
   tool(
-    "end_review",
+    "ruyi_design_end_review",
     "Stop local listeners; retain project review records.",
     z.object(sid),
     async (args) => {
@@ -201,13 +197,13 @@ export function createMcp() {
   const resources = [
     [
       "workflow",
-      "uxai://guides/prototype-review",
+      "ruyi-design://guides/review",
       () => guide(),
       "text/markdown",
     ],
     [
       "manifest-schema",
-      "uxai://schemas/manifest",
+      "ruyi-design://schemas/manifest",
       () =>
         readFile(
           path.join(packageRoot, "schemas/manifest.schema.json"),
@@ -217,7 +213,7 @@ export function createMcp() {
     ],
     [
       "manifest-template",
-      "uxai://templates/manifest",
+      "ruyi-design://templates/manifest",
       () =>
         readFile(
           path.join(packageRoot, "examples/starter/design/manifest.json"),

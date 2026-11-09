@@ -1,28 +1,32 @@
+import { BRAND, BRAND_COLORS } from "../../contracts/brand.js";
 import { isBridgeMessage, type BridgeMessage } from "../../contracts/bridge.js";
 
 declare global {
   interface Window {
-    __UXAI_CONFIG__?: { origin: string; sessionId: string };
-    uxaiReviewState?: {
+    __RUYI_DESIGN_CONFIG__?: { origin: string; sessionId: string };
+    ruyiUxaiReviewState?: Window["ruyiDesignReviewState"];
+    uxaiReviewState?: Window["ruyiDesignReviewState"];
+    ruyiDesignReviewState?: {
       exportState: () => unknown;
       restoreState: (state: unknown) => void | Promise<void>;
     };
   }
 }
-const config = window.__UXAI_CONFIG__;
+const config = window[BRAND.configGlobal];
+const stateApi = () => window.ruyiDesignReviewState ?? window.ruyiUxaiReviewState ?? window.uxaiReviewState;
 if (config && window.parent !== window) {
   const frameId = window.name;
   let mode = "experience";
   let start: { x: number; y: number } | undefined;
   const send = (type: BridgeMessage["type"], payload?: any) =>
     window.parent.postMessage(
-      { channel: "uxai-review", version: 1, frameId, type, payload },
+      { channel: BRAND.bridgeChannel, version: 1, frameId, type, payload },
       config.origin,
     );
   const outline = document.createElement("div");
-  outline.setAttribute("data-uxai-overlay", "");
+  outline.setAttribute(BRAND.overlayAttribute, "");
   outline.style.cssText =
-    "position:fixed;pointer-events:none;border:2px solid #4f46e5;background:#4f46e514;z-index:2147483647;display:none;box-sizing:border-box";
+    `position:fixed;pointer-events:none;border:2px solid ${BRAND_COLORS.primary};background:${BRAND_COLORS.primary}14;z-index:2147483647;display:none;box-sizing:border-box`;
   const show = (r: { x: number; y: number; width: number; height: number }, deleted = false) => {
     outline.textContent = deleted ? "此处已删除" : "";
     Object.assign(outline.style, {
@@ -32,8 +36,8 @@ if (config && window.parent !== window) {
       width: r.width + "px",
       height: r.height + "px",
       borderStyle: deleted ? "dashed" : "solid",
-      borderColor: deleted ? "#b77912" : "#4f46e5",
-      background: deleted ? "#f59e0b14" : "#4f46e514",
+      borderColor: deleted ? BRAND_COLORS.deletion : BRAND_COLORS.primary,
+      background: deleted ? "#f59e0b14" : `${BRAND_COLORS.primary}14`,
       color: "#78500b",
       font: "600 12px/1.5 system-ui, sans-serif",
       padding: deleted ? "6px" : "0",
@@ -81,9 +85,28 @@ if (config && window.parent !== window) {
             : [];
         }),
       focus: document.activeElement ? key(document.activeElement) : undefined,
-      custom: window.uxaiReviewState?.exportState(),
+      custom: stateApi()?.exportState(),
     };
   }
+  let measuring = false;
+  let lastHeight = 0;
+  let measureScheduled = false;
+  const reportSize = () => {
+    if (!measuring || measureScheduled) return;
+    measureScheduled = true;
+    setTimeout(() => {
+      measureScheduled = false;
+      const dialogs = [...document.querySelectorAll("dialog[open]")].map(e => e.getBoundingClientRect().height + 48);
+      const body = document.body.getBoundingClientRect();
+      // body.scrollHeight can report the iframe viewport itself, preventing shrink.
+      // Measure laid-out content instead, excluding the fixed review overlay.
+      const bottoms = [...document.body.children]
+        .filter(e => !e.hasAttribute(BRAND.overlayAttribute) && getComputedStyle(e).position !== "fixed")
+        .map(e => e.getBoundingClientRect().bottom - body.top + parseFloat(getComputedStyle(e).marginBottom || "0"));
+      const height = Math.min(7680, Math.max(160, Math.ceil(body.height), ...bottoms.map(Math.ceil), ...dialogs));
+      if (height !== lastHeight) { lastHeight = height; send("resize", { height }); }
+    });
+  };
   const loaded = () => {
     document.body.append(outline);
     send("ready");
@@ -100,6 +123,17 @@ if (config && window.parent !== window) {
     )
       return;
     const m = event.data;
+    if (m.type === "measure" && !measuring) {
+      measuring = true;
+      const style = document.createElement("style");
+      style.textContent = "html,body{min-height:0!important;height:auto!important}";
+      document.head.append(style);
+      new ResizeObserver(reportSize).observe(document.body);
+      new MutationObserver(reportSize).observe(document.body, { subtree: true, childList: true, attributes: true });
+      document.fonts.ready.then(reportSize);
+      document.addEventListener("load", reportSize, true);
+      reportSize();
+    }
     if (m.type === "mode") {
       mode = m.payload;
       outline.style.display = "none";
@@ -130,8 +164,8 @@ if (config && window.parent !== window) {
           e.dispatchEvent(new Event("change", { bubbles: true }));
         }
         if (s.custom !== undefined) {
-          if (window.uxaiReviewState)
-            await window.uxaiReviewState.restoreState(s.custom);
+          const api = stateApi();
+          if (api) await api.restoreState(s.custom);
           else restored = false;
         }
         if (s.hash) location.hash = s.hash;

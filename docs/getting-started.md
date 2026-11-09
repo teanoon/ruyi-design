@@ -3,22 +3,22 @@
 Install the tarball from the local release candidate into your project using npm. A published registry package will use the same interface; publication is a separate release action.
 
 ```bash
-npm install -D /absolute/path/uxai-review-0.1.0.tgz
+npm install -D /absolute/path/littlehobby-ruyi-design-0.1.0.tgz
 npx playwright install chromium
-npx uxai-review doctor
+npx ruyi-design doctor
 ```
 
 Chromium is required for publication checks, not downloaded by package installation. Run `npx playwright install-deps chromium` if your operating system is missing browser shared libraries. `doctor` checks the binary; the publication check reports launch failures as `validation_unavailable` without changing the active version.
 
-Copy the bundled starter directory into `design/`, or ask the coding agent to author a manifest and assets based on `uxai://templates/manifest` and `uxai://schemas/manifest`. The manifest validates object IDs and references as well as local entry files. A Git repository is optional.
+Copy the bundled starter directory into `design/`, or ask the coding agent to author a manifest and assets based on `ruyi-design://templates/manifest` and `ruyi-design://schemas/manifest`. The manifest validates object IDs and references as well as local entry files. A Git repository is optional.
 
 Install the optional project skill explicitly:
 
 ```bash
-npx uxai-review setup --client codex --project /absolute/path/to/project
+npx ruyi-design setup --client codex --project /absolute/path/to/project
 ```
 
-Setup writes only `.agents/skills/prototype-review/`, leaves identical installed files alone, and rejects changed existing skill files. It does not alter your MCP configuration. Configure the MCP command as described in [MCP integration](mcp.md).
+Setup writes only `.agents/skills/ruyi-design-review/`, leaves identical installed files alone, and rejects changed existing skill files. It does not alter your MCP configuration. Configure the MCP command as described in [MCP integration](mcp.md).
 
 Ask the agent to start a review using the absolute project root and `design/` root. Open the returned URL, including its initial token fragment. The workspace keeps the credential in session-scoped tab storage and removes it from the URL, so refreshing the same tab retains access. Open the complete original link in a new tab.
 
@@ -30,4 +30,8 @@ The Locate action opens the comment’s page, state and device in the current pu
 
 Pages and component showcases share implementations and token CSS. Source saves do not publish a revision. CSS-only publications update styles in place; structural and JS changes automatically rebuild the prototype iframe and attempt restoration. The workspace, saved drafts and unsaved composer text remain in place. Arbitrary JS memory is not retained.
 
-Close a review with MCP `end_review`, or stop its client process. Review records remain under `.uxai-review/` in your project. Reopening uses the last published version and existing comment history. The agent must reload context and reclaim expired leases.
+Close a review with MCP `ruyi_design_end_review`, or stop its client process. New review records use `.ruyi-design/`. Existing projects reuse a sole `.ruyi-uxai/` or `.uxai-review/` in place. If multiple candidate directories exist, pass `dataRoot` explicitly; no directories are merged. Reopening uses the last published version and existing comment history. The agent must reload context and reclaim expired leases.
+
+The browser also provides **归档** for comments that no longer require work, including unchanged results and reopened drafts. Manual archiving preserves the original result and does not claim a verified fix; **确认解决** remains for published changes. Queued/processing feedback must finish or be released before archiving. Reopen and archive again at any time after processing ends.
+
+You can also ask for changes directly in the AI conversation, without first leaving a browser comment. The agent publishes that explicit request as a new revision of the same session using the conversation mode of publish_revision. Your existing comments, archive and history remain intact.
