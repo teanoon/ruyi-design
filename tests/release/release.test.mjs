@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, rm, copyFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { validateMetadata, registry, packageName, assertUnpublished, cleanCommit, command, artifactInfo, verifyArtifact, publish, publishArguments, verifyRemote, waitForRemote, prepare } from "../../scripts/release.mjs";
@@ -70,6 +70,40 @@ test("artifact changes, corruption, omitted acceptance and path traversal fail v
   await writeFile(tarball, "corrupt bytes");
   await assert.rejects(verifyArtifact(manifest, root));
 }));
+test("package-only acceptance requires an explicit profile and preserves core release checks", () => fixture(async ({ root, tarball, manifest }) => {
+  const checks = { ...manifest.checks, browser: "skipped", conversation: "skipped", gateway: "skipped", discovery: "skipped" };
+  const packaged = { ...manifest, validationProfile: "package", checks };
+  assert.equal(await verifyArtifact(packaged, root), tarball);
+  for (const invalid of [
+    { ...manifest, checks },
+    { ...packaged, validationProfile: "unknown" },
+    { ...packaged, validationProfile: "full" },
+    { ...packaged, checks: { ...checks, install: "skipped" } },
+    { ...packaged, checks: { ...checks, browser: true } },
+  ]) await assert.rejects(verifyArtifact(invalid, root), /release checks/);
+}));
+for (const browserChecks of [false, true]) {
+  test(`${browserChecks ? "full" : "package-only"} preparation records the selected checks and forwards the install mode`, () => fixture(async ({ root, tarball, manifest }) => {
+    const filename = `littlehobby-ruyi-design-${pkg.version}.tgz`;
+    await copyFile(tarball, path.join(root, "dist", filename));
+    const calls = [];
+    const run = (file, args, options) => {
+      if (file === "git") return args[0] === "status" ? "" : manifest.commit;
+      if (file === "npm" || file === process.execPath) { calls.push([file, args]); return ""; }
+      return command(file, args, options);
+    };
+    const prepared = await prepare({ root, browserChecks, run, fetcher: response(404) });
+    assert.equal(prepared.validationProfile, browserChecks ? "full" : "package");
+    const scripts = calls.filter(([file, args]) => file === "npm" && args[0] === "run").map(([, args]) => args[1]);
+    assert.deepEqual(scripts, browserChecks ? ["typecheck", "test", "test:release", "build", "test:browser", "test:conversation", "test:gateway", "test:discovery", "pack:local"] : ["typecheck", "test", "test:release", "pack:local"]);
+    const install = calls.find(([file]) => file === process.execPath)[1];
+    assert.equal(install.includes("--skip-browser-checks"), !browserChecks);
+    for (const check of ["browser", "conversation", "gateway", "discovery"]) assert.equal(prepared.checks[check], browserChecks ? true : "skipped");
+    for (const check of ["typecheck", "unit", "release", "install", "dryRun"]) assert.equal(prepared.checks[check], true);
+    assert(calls.some(([file, args]) => file === "npm" && args[0] === "publish" && args.includes("--dry-run")));
+    await verifyArtifact(prepared, root);
+  }));
+}
 test("publication gates permissions, version, commit, conflict; uploads accepted bytes without lifecycle rebuild", () => fixture(async ({ root, tarball, manifest, manifestPath }) => {
   const uploads = [];
   const run = (file, args, options) => {

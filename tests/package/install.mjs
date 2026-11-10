@@ -1,17 +1,20 @@
 import { execFile } from "node:child_process";
-import { promisify } from "node:util";
+import { promisify, parseArgs } from "node:util";
 import { mkdtemp, rm, writeFile, readFile, access, mkdir } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { workflow } from "../browser/workflow.mjs";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 const exec = promisify(execFile),
   root = process.cwd();
+const { values, positionals } = parseArgs({ allowPositionals: true, options: { "skip-browser-checks": { type: "boolean" } } });
+assert(positionals.length <= 1, "Pass a single tarball path");
+const browserChecks = !values["skip-browser-checks"];
 let tarball, pack;
-if (process.argv[2]) {
-  assert.equal(process.argv.length, 3, "Pass a single tarball path");
-  tarball = path.resolve(process.argv[2]);
+if (positionals[0]) {
+  tarball = path.resolve(positionals[0]);
   const { stdout } = await exec("tar", ["-tzf", tarball]);
   pack = { filename: path.basename(tarball), files: stdout.trim().split("\n").filter(f => !f.endsWith("/")).map(f => {
     assert(f.startsWith("package/") && !f.split("/").includes(".."), f);
@@ -74,31 +77,37 @@ try {
   );
   const installed = path.join(temp, "node_modules/@littlehobby/ruyi-design");
   await access(path.join(temp, "node_modules/.bin/ruyi-design"));
-  const doctor = await exec(
-    path.join(temp, "node_modules/.bin/ruyi-design"),
-    ["doctor"],
-    { cwd: temp },
-  );
-  assert(JSON.parse(doctor.stdout).workspace);
-  assert(JSON.parse(doctor.stdout).browser.available);
+  await access(path.join(installed, "dist/workspace/index.html"));
+  await access(path.join(installed, "dist/bridge/bridge.js"));
   const pkg = JSON.parse(
     await readFile(path.join(installed, "package.json"), "utf8"),
   );
   assert.equal(pkg.name, "@littlehobby/ruyi-design");
   assert(!pkg.scripts.postinstall);
   const binary = path.join(temp, "node_modules/.bin/ruyi-design");
+  assert((await exec(binary, ["--help"], { cwd: temp })).stdout.includes("ruyi-design mcp"));
   const setup = JSON.parse((await exec(binary, ["setup", "--client", "codex", "--project", temp], { cwd: temp })).stdout);
   assert(setup.written > 0);
   assert.equal(JSON.parse((await exec(binary, ["setup", "--client", "codex", "--project", temp], { cwd: temp })).stdout).written, 0);
   assert((await readFile(path.join(temp, ".agents/skills/ruyi-design-review/SKILL.md"), "utf8")).includes("name: ruyi-design-review"));
-  await workflow({
-    cli: path.join(installed, "dist/cli/index.js"),
-    starter: path.join(installed, "examples/starter/design"),
-    screenshot: false,
-  });
+  const mcp = new Client({ name: "package-install-test", version: "1" });
+  try {
+    await mcp.connect(new StdioClientTransport({ command: process.execPath, args: [path.join(installed, "dist/cli/index.js"), "mcp"], cwd: temp, env: process.env, stderr: "pipe" }));
+    assert.equal(mcp.getServerVersion().name, "ruyi-design-mcp");
+    const tools = (await mcp.listTools()).tools;
+    assert.equal(tools.length, 9);
+    assert(tools.some(tool => tool.name === "ruyi_design_publish_revision"));
+    assert((await mcp.readResource({ uri: "ruyi-design://guides/review" })).contents[0].text.includes("ruyi_design_publish_revision"));
+  } finally { await mcp.close(); }
+  if (browserChecks) {
+    const doctor = JSON.parse((await exec(binary, ["doctor"], { cwd: temp })).stdout);
+    assert(doctor.workspace && doctor.browser.available);
+    const { workflow } = await import("../browser/workflow.mjs");
+    await workflow({ cli: path.join(installed, "dist/cli/index.js"), starter: path.join(installed, "examples/starter/design"), screenshot: false });
+  }
   assert.equal(await digest(), before, "Acceptance must not alter the tarball");
   console.log(
-    `Tarball install passed: dist/${pack.filename}; ${pack.files.length} public files; consumer has no dev dependencies.`,
+    `Tarball install passed: dist/${pack.filename}; ${pack.files.length} public files; consumer has no dev dependencies; browser checks ${browserChecks ? "passed" : "skipped (CLI/MCP/skill checks passed)"}.`,
   );
 } finally {
   await rm(temp, { recursive: true, force: true });

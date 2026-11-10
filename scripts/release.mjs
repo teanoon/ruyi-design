@@ -8,6 +8,8 @@ import { setTimeout as delay } from "node:timers/promises";
 
 export const registry = "https://registry.npmjs.org/";
 export const packageName = "@littlehobby/ruyi-design";
+const coreChecks = ["typecheck", "unit", "release", "install", "dryRun"];
+const browserChecks = ["browser", "conversation", "gateway", "discovery"];
 export function command(file, args, { cwd = process.cwd(), capture = false } = {}) {
   const result = spawnSync(file, args, { cwd, encoding: "utf8", stdio: capture ? "pipe" : "inherit", timeout: 600000 });
   if (result.error || result.status !== 0) throw new Error(`${file} ${args[0]} failed (${result.status ?? result.error?.code})${capture ? `: ${result.stderr?.trim()}` : ""}`);
@@ -61,7 +63,8 @@ export async function verifyArtifact(manifest, root, run = command) {
   const info = await artifactInfo(tarball, run);
   if (manifest.name !== packageName || info.name !== manifest.name || info.version !== manifest.version || info.sha512 !== manifest.sha512 || info.integrity !== manifest.integrity || JSON.stringify(info.files) !== JSON.stringify(manifest.files))
     throw new Error("Artifact identity, file list or digest changed; repeat acceptance");
-  if (manifest.registry !== registry || manifest.access !== "public" || manifest.schemaVersion !== 1 || ["typecheck", "unit", "release", "browser", "conversation", "gateway", "discovery", "install", "dryRun"].some(k => manifest.checks?.[k] !== true))
+  const profile = manifest.validationProfile ?? "full";
+  if (manifest.registry !== registry || manifest.access !== "public" || manifest.schemaVersion !== 1 || !["full", "package"].includes(profile) || coreChecks.some(k => manifest.checks?.[k] !== true) || browserChecks.some(k => manifest.checks?.[k] !== (profile === "package" ? "skipped" : true)))
     throw new Error("Manifest has not passed all release checks");
   return tarball;
 }
@@ -88,14 +91,15 @@ export async function waitForRemote(manifest, { fetcher = fetch, timeoutMs = 15 
     await sleep(Math.min(pollMs, remaining));
   }
 }
-export async function prepare({ root = process.cwd(), version, tag, run = command, fetcher = fetch } = {}) {
+export async function prepare({ root = process.cwd(), version, tag, run = command, fetcher = fetch, browserChecks: includeBrowserChecks = true } = {}) {
   const commit = cleanCommit(run, root);
   const pkg = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
   const lock = JSON.parse(await readFile(path.join(root, "package-lock.json"), "utf8"));
   tag = validateMetadata(pkg, lock, version, tag);
   await assertUnpublished(pkg.version, fetcher);
-  const checks = {};
+  const checks = Object.fromEntries(browserChecks.map(check => [check, includeBrowserChecks ? false : "skipped"]));
   for (const [check, script] of [["typecheck", "typecheck"], ["unit", "test"], ["release", "test:release"], ["browser", "test:browser"], ["conversation", "test:conversation"], ["gateway", "test:gateway"], ["discovery", "test:discovery"]]) {
+    if (!includeBrowserChecks && browserChecks.includes(check)) continue;
     // Browser scripts use the built runtime.
     if (check === "browser") run("npm", ["run", "build"], { cwd: root });
     run("npm", ["run", script], { cwd: root }); checks[check] = true;
@@ -106,11 +110,11 @@ export async function prepare({ root = process.cwd(), version, tag, run = comman
   const tarball = path.join(root, "dist", filename);
   const info = await artifactInfo(tarball, run);
   if (info.name !== pkg.name || info.version !== pkg.version) throw new Error("Packed identity mismatch");
-  run(process.execPath, ["tests/package/install.mjs", tarball], { cwd: root }); checks.install = true;
+  run(process.execPath, ["tests/package/install.mjs", tarball, ...(!includeBrowserChecks ? ["--skip-browser-checks"] : [])], { cwd: root }); checks.install = true;
   run("npm", publishArguments(tarball, tag, true), { cwd: root }); checks.dryRun = true;
   if (cleanCommit(run, root) !== commit || (await artifactInfo(tarball, run)).sha512 !== info.sha512) throw new Error("Source or archive changed during acceptance");
   const { pkg: _pkg, ...artifact } = info;
-  const manifest = { schemaVersion: 1, commit, ...artifact, tarball: filename, registry, access: "public", tag, checks };
+  const manifest = { schemaVersion: 1, commit, ...artifact, tarball: filename, registry, access: "public", tag, validationProfile: includeBrowserChecks ? "full" : "package", checks };
   const output = path.join(root, "dist", `release-${pkg.version}.json`);
   await writeFile(output, JSON.stringify(manifest, null, 2) + "\n");
   console.log(`Release prepared without upload: ${output}\n${info.integrity}`);
@@ -134,9 +138,9 @@ export async function publish({ root = process.cwd(), manifestPath, confirmLicen
 }
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try {
-    const { values, positionals } = parseArgs({ allowPositionals: true, options: { version: { type: "string" }, tag: { type: "string" }, manifest: { type: "string" }, "confirm-license": { type: "boolean" }, "confirm-scope": { type: "boolean" }, "confirm-version": { type: "string" } } });
+    const { values, positionals } = parseArgs({ allowPositionals: true, options: { version: { type: "string" }, tag: { type: "string" }, manifest: { type: "string" }, "skip-browser-checks": { type: "boolean" }, "confirm-license": { type: "boolean" }, "confirm-scope": { type: "boolean" }, "confirm-version": { type: "string" } } });
     if (positionals.length !== 1) throw new Error("Use prepare or publish");
-    if (positionals[0] === "prepare") await prepare(values);
+    if (positionals[0] === "prepare") await prepare({ version: values.version, tag: values.tag, browserChecks: !values["skip-browser-checks"] });
     else if (positionals[0] === "publish") await publish({ manifestPath: values.manifest, confirmLicense: values["confirm-license"], confirmScope: values["confirm-scope"], confirmVersion: values["confirm-version"] });
     else throw new Error("Use prepare or publish");
   } catch (error) { console.error(error.message); process.exitCode = 1; }

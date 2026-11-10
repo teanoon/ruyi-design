@@ -53,12 +53,11 @@ jobs:
           ref: ${{ steps.target.outputs.sha }}
           persist-credentials: false
       - run: npm ci --ignore-scripts
-      - run: npx --no-install playwright install --with-deps chromium
       - name: Prepare and accept one archive
         env:
           RELEASE_VERSION: ${{ inputs.version }}
           RELEASE_TAG: ${{ inputs.tag }}
-        run: node scripts/release.mjs prepare --version "$RELEASE_VERSION" --tag "$RELEASE_TAG"
+        run: node scripts/release.mjs prepare --version "$RELEASE_VERSION" --tag "$RELEASE_TAG" --skip-browser-checks
       - uses: actions/upload-artifact@v4
         with:
           name: npm-release-${{ steps.target.outputs.sha }}

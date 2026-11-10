@@ -2,7 +2,7 @@
 
 This process publishes `@littlehobby/ruyi-design` to npmjs. Design publication through `ruyi_design_publish_revision` is a separate local preview operation.
 
-Use Node 24+, npm 11.5.1+ (the workflow pins npm 11.17.0 for upload), Git and `tar`. Install dependencies with `npm ci --ignore-scripts`. Browser tests require an installed Playwright Chromium; on Linux CI use `npx --no-install playwright install --with-deps chromium`. Consumer runtime browser discovery does not download anything. Set browser selection in the MCP environment as described in [Getting started](getting-started.md).
+Use Node 24+, npm 11.5.1+ (the workflow pins npm 11.17.0 for upload), Git and `tar`. Install dependencies with `npm ci --ignore-scripts`. The GitHub package-release workflow does not install, discover or launch a browser. Optional local browser regressions require an installed Playwright Chromium. Consumer runtime browser selection is described in [Getting started](getting-started.md).
 
 ## Prepare a committed version
 
@@ -20,13 +20,23 @@ npm publish /absolute/path/to/dist/littlehobby-ruyi-design-0.1.0.tgz --dry-run -
 
 No upload occurs. A dry-run checks the archive and publication options; it does not establish account permissions, license approval or OIDC trust. The resulting `dist/release-0.1.0.json` records Git SHA, package name/version, tag, public file list, SHA-512/integrity and acceptance results. Archives and release manifests are excluded from the package. No credentials or absolute local paths are recorded in the manifest.
 
+Local preparation defaults to the full browser-regression profile. The Actions workflow explicitly selects package-only acceptance:
+
+```bash
+npm run release:prepare -- --version 0.1.0 --tag latest --skip-browser-checks
+```
+
+This mode keeps typecheck, unit tests (including simulated browser-selection tests), release tests, build, file-boundary/digest checks, independent installation, CLI help, skill setup, stdio MCP handshake/tool/resource checks and npm dry-run. It does not call doctor or run browser, conversation, gateway or discovery integration suites. The manifest records `validationProfile: "package"` and marks those four checks as `"skipped"`; upload requires the core checks to pass and the declared profile to match. Full-profile and legacy full-validation manifests remain supported. Design revision publication in the product still performs its normal browser validation.
+
 You can repeat consumer acceptance without rebuilding:
 
 ```bash
 node tests/package/install.mjs /absolute/path/to/dist/littlehobby-ruyi-design-0.1.0.tgz
 ```
 
-Keep the manifest and archive together. Any archive change requires preparation/acceptance again. Upload verifies the current clean checkout matches the manifest commit, the explicit version matches, the accepted bytes and file list are unchanged, all checks passed and the version is still unpublished. It disables lifecycle scripts so npm does not silently rebuild the archive. After upload it waits up to 15 minutes, polling every 30 seconds for the version to become available after npm's publish-time scanning, then checks the remote name, version, dist-tag and `dist.integrity`. A missing package/version during that wait never causes another upload. A published metadata mismatch or registry error fails immediately. If processing times out, inspect registry state and continue read-only verification; do not rerun the publication or automatically choose another version/tag.
+Add `--skip-browser-checks` to repeat only package/CLI/MCP/skill acceptance without doctor or a browser workflow. Omitting it retains the full installation test.
+
+Keep the manifest and archive together. Any archive change requires preparation/acceptance again. Upload verifies the current clean checkout matches the manifest commit, the explicit version matches, the accepted bytes and file list are unchanged, all required checks for the declared validation profile passed and the version is still unpublished. It disables lifecycle scripts so npm does not silently rebuild the archive. After upload it waits up to 15 minutes, polling every 30 seconds for the version to become available after npm's publish-time scanning, then checks the remote name, version, dist-tag and `dist.integrity`. A missing package/version during that wait never causes another upload. A published metadata mismatch or registry error fails immediately. If processing times out, inspect registry state and continue read-only verification; do not rerun the publication or automatically choose another version/tag.
 
 ## Manual first publication
 
@@ -47,7 +57,7 @@ Configure these external prerequisites as maintainer actions:
 1. Create the first npm package manually and confirm scope access and license intent.
 2. In `teanoon/ruyi-design`, create a GitHub environment named `npmjs`, add required reviewers and restrict deployment branches to `main`. Protect main and release tags.
 3. In the npm package's Trusted Publisher settings, select GitHub Actions: owner `teanoon`, repository `ruyi-design`, workflow filename `publish.yml`, environment `npmjs`. Enable the allowed action for direct `npm publish`; stage-only trust does not authorize this workflow. These names are case-sensitive. The workflow must already exist on main. Check npm's current expiry rules when configuring a new trust relationship. Account-level setup may require a one-time browser/2FA confirmation; subsequent Actions publishes use OIDC instead of the maintainer's local npm login.
-4. Use GitHub-hosted Ubuntu runners. Trusted publishing currently requires npm 11.5.1+ and Node 22.14+; this repository uses Node 24 and npm 11.17.0. The prepare job explicitly installs the validation browser. No npm login token is configured for CI.
+4. Use GitHub-hosted Ubuntu runners. Trusted publishing currently requires npm 11.5.1+ and Node 22.14+; this repository uses Node 24 and npm 11.17.0. The prepare job uses package-only acceptance and requires no browser installation. No npm login token is configured for CI.
 
 Dispatch **Publish npm package** from the main branch, enter the exact version, `main`, a full main-reachable commit SHA or matching `vVERSION` tag, and a dist-tag. Confirm public distribution and scope permission in the dispatch input. Ordinary push/PR events never publish. The trusted main checkout resolves the target, checks main ancestry and package version before executing target code. A PR ref or unrelated commit is rejected.
 
