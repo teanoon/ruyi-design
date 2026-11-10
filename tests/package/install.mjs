@@ -4,16 +4,29 @@ import { mkdtemp, rm, writeFile, readFile, access, mkdir } from "node:fs/promise
 import os from "node:os";
 import path from "node:path";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { workflow } from "../browser/workflow.mjs";
 const exec = promisify(execFile),
   root = process.cwd();
-await mkdir(path.join(root, "dist"), { recursive: true });
-const { stdout } = await exec("npm", ["pack", "--pack-destination", "dist", "--json", "--ignore-scripts"], {
-  cwd: root,
-});
-const [pack] = JSON.parse(stdout);
-const tarball = path.resolve(root, "dist", pack.filename);
+let tarball, pack;
+if (process.argv[2]) {
+  assert.equal(process.argv.length, 3, "Pass a single tarball path");
+  tarball = path.resolve(process.argv[2]);
+  const { stdout } = await exec("tar", ["-tzf", tarball]);
+  pack = { filename: path.basename(tarball), files: stdout.trim().split("\n").filter(f => !f.endsWith("/")).map(f => {
+    assert(f.startsWith("package/") && !f.split("/").includes(".."), f);
+    return { path: f.slice(8) };
+  }) };
+} else {
+  await mkdir(path.join(root, "dist"), { recursive: true });
+  const { stdout } = await exec("npm", ["pack", "--pack-destination", "dist", "--json", "--ignore-scripts"], { cwd: root });
+  [pack] = JSON.parse(stdout);
+  tarball = path.resolve(root, "dist", pack.filename);
+}
+const digest = async () => createHash("sha512").update(await readFile(tarball)).digest("hex");
+const before = await digest();
 assert(pack.files.every(file => !file.path.endsWith(".tgz")), "Release archives must not be nested in the npm package");
+assert(pack.files.every(file => !/^dist\/release-.*\.json$/.test(file.path)), "Release manifests must not enter the package");
 for (const file of pack.files)
   assert(
     !/^(src|tests|openspec|node_modules|\.codex-home|\.ruyi-design|\.ruyi-uxai|\.uxai-review)\//.test(
@@ -54,7 +67,7 @@ try {
       "--ignore-scripts",
       "--no-audit",
       "--no-fund",
-      "--offline",
+      "--prefer-offline",
       tarball,
     ],
     { cwd: temp, timeout: 120000 },
@@ -67,6 +80,7 @@ try {
     { cwd: temp },
   );
   assert(JSON.parse(doctor.stdout).workspace);
+  assert(JSON.parse(doctor.stdout).browser.available);
   const pkg = JSON.parse(
     await readFile(path.join(installed, "package.json"), "utf8"),
   );
@@ -82,6 +96,7 @@ try {
     starter: path.join(installed, "examples/starter/design"),
     screenshot: false,
   });
+  assert.equal(await digest(), before, "Acceptance must not alter the tarball");
   console.log(
     `Tarball install passed: dist/${pack.filename}; ${pack.files.length} public files; consumer has no dev dependencies.`,
   );

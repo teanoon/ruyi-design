@@ -1,9 +1,10 @@
 import Fastify from "fastify";
 import { chromium } from "playwright";
-import { mkdtemp, cp, rm } from "node:fs/promises";
+import { mkdtemp, cp, rm, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import assert from "node:assert/strict";
+import { Readable } from "node:stream";
 import { ReviewServer, startSchema } from "../../dist/server/index.js";
 const root = await mkdtemp(path.join(os.tmpdir(), "uxai-gateway-"));
 await cp("examples/starter/design", path.join(root, "design"), {
@@ -29,6 +30,14 @@ gateway.all("/*", async (req, reply) => {
   delete headers["content-length"];
   if (headers.origin === new URL(gatewayBase).origin)
     headers.origin = new URL(app.internalBase).origin;
+  // Inject buffers a complete response and cannot proxy the open event stream.
+  if (url.pathname.endsWith("/events")) {
+    const controller = new AbortController();
+    reply.raw.on("close", () => controller.abort());
+    const response = await fetch(new URL(url.pathname + url.search, app.internalBase), { headers, signal: controller.signal });
+    reply.type(response.headers.get("content-type"));
+    return reply.code(response.status).send(Readable.fromWeb(response.body));
+  }
   const result = await app.control.inject({
     method: req.method,
     url: url.pathname + url.search,
@@ -165,8 +174,13 @@ try {
   await page.locator(".comment-card").filter({ hasText: "Removed element feedback" }).getByRole("button", { name: "定位", exact: true }).click();
   await page.getByText("定位已失效或存在歧义，保留原版本评论上下文。", { exact: true }).waitFor();
   assert.equal(await frame.locator("[data-ruyi-design-overlay]").isVisible(), false);
+  const css = path.join(root, "design/components/shared.css");
+  await writeFile(css, (await readFile(css, "utf8")) + "\n/* Gateway publication regression */\n");
+  const published = await app.publish({ source: "conversation", request: "Verify publication through the configured gateway", idempotencyKey: "gateway-publication", expectedBaseRevision: app.info().revisionId });
+  await page.locator("#revision .revision-full").filter({ hasText: published.id.slice(0, 8) }).waitFor({ state: "attached" });
+  assert.equal(app.session.active().id, published.id);
   console.log(
-    "Gateway preview passed: routing query, rewritten Host/Origin, opaque-frame modules, saved element feedback without submission or agent monitoring, navigation.",
+    "Gateway preview passed: routing query, rewritten Host/Origin, opaque-frame modules, saved element feedback, navigation and publication through internal candidate validation.",
   );
   assert.deepEqual(problems, []);
   const forbidden = await app.control.inject({

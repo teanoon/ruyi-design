@@ -13,13 +13,18 @@ Install the tarball from the local release candidate into your project using npm
 
 ```bash
 npm install -D /absolute/path/to/ruyi-design/dist/littlehobby-ruyi-design-0.1.0.tgz
-npx playwright install chromium
 npx ruyi-design doctor
 ```
 
 Chromium runs headlessly on the machine running MCP. When the agent publishes a revision, Playwright opens every declared page/state/device and component/device entry with its configured viewport, checks that the entry loads, and collects JavaScript exceptions, HTTP errors and failed resource requests. Only a passing candidate replaces the active revision; failed validation retains the previous version. This checks loading and execution, not subjective visual quality or every interaction.
 
-Starting MCP, viewing an existing preview and saving comments do not launch Chromium; publishing a revision requires it. Users can review the site in their usual browser. Install Chromium in the same environment/user account as the MCP process (for example, inside WSL or the container). It is not downloaded by package installation. Run `npx playwright install-deps chromium` if your operating system is missing browser shared libraries. `doctor` checks the binary; the publication check reports launch failures as `validation_unavailable` without changing the active version.
+Starting MCP, viewing an existing preview and saving comments do not launch a validation browser; publishing a revision requires one. Users can review the site in their usual browser. Automatic selection tries Chrome, Edge, Chromium at platform installation paths and absolute PATH entries, then already installed Playwright Chromium. It uses the MCP machine and account; WSL discovers Linux browsers and does not search Windows mounts.
+
+To select explicitly, set either `RUYI_DESIGN_BROWSER_CHANNEL=chrome` (or `msedge`) or `RUYI_DESIGN_BROWSER_EXECUTABLE=/absolute/path/to/chromium`. Both together, empty values, relative paths and unsupported channels fail. Explicit selections never fall back. System/custom versions must pass an actual launch and script check. All validation runs in a separate headless instance with temporary context; it does not use your normal windows, profile or login state.
+
+`doctor` performs that same launch check, reports `browser.available`, source, version and attempts, then closes the browser. Its exit status requires the workspace, bridge and a usable browser. The legacy `chromium` boolean still only means the default Playwright executable exists, so it may be false while doctor succeeds with a system/custom browser. Discovery allows up to 10 seconds per candidate within a 30-second overall startup budget. Publication reports failures as `validation_unavailable` and keeps the active version.
+
+If discovery fails, install Chromium explicitly with `npx playwright install chromium` in the same environment/account as MCP, or configure an installed executable. Package installation and runtime discovery never download browsers. Run `npx playwright install-deps chromium` if your operating system is missing browser shared libraries.
 
 If the project already has `design/manifest.json`, keep its existing design assets. Otherwise copy the bundled starter directory into `design/`, or ask the coding agent to author a manifest and assets based on `ruyi-design://templates/manifest` and `ruyi-design://schemas/manifest`. The manifest validates object IDs and references as well as local entry files. A Git repository is optional.
 

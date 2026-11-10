@@ -1,0 +1,73 @@
+import assert from "node:assert/strict";
+import { mkdtemp, mkdir, writeFile, rm, readdir, symlink } from "node:fs/promises";
+import path from "node:path";
+import os from "node:os";
+import { chromium } from "playwright";
+import { promisify } from "node:util";
+import { execFile } from "node:child_process";
+import { ReviewServer, startSchema } from "../../dist/server/index.js";
+import { diagnoseBrowser } from "../../dist/core/browser/index.js";
+const exec = promisify(execFile);
+const root = await mkdtemp(path.join(os.tmpdir(), "ruyi-discovery-"));
+const design = path.join(root, "design");
+const saved = { ...process.env };
+let app;
+try {
+  delete process.env.RUYI_DESIGN_BROWSER_EXECUTABLE;
+  delete process.env.RUYI_DESIGN_BROWSER_CHANNEL;
+  const fallback = await diagnoseBrowser({ env: {} });
+  assert(fallback.available);
+  // An executable on PATH is reusable with no Playwright browser present.
+  const tools = path.join(root, "bin"); await mkdir(tools);
+  await symlink(chromium.executablePath(), path.join(tools, "chromium"));
+  const system = await diagnoseBrowser({ env: { PATH: tools }, bundledPath: path.join(root, "missing-bundled") });
+  assert(system.available); assert.equal(system.source, "system");
+  process.env.RUYI_DESIGN_BROWSER_EXECUTABLE = chromium.executablePath();
+  process.env.PLAYWRIGHT_BROWSERS_PATH = path.join(root, "no-bundled");
+  const doctor = JSON.parse((await exec(process.execPath, [path.resolve("dist/cli/index.js"), "doctor", "--project", root], { env: process.env })).stdout);
+  assert.equal(doctor.chromium, false); assert(doctor.browser.available); assert.equal(doctor.browser.source, "explicit");
+  await mkdir(design);
+  await writeFile(path.join(design, "manifest.json"), JSON.stringify({ schemaVersion: 1, id: "discovery", name: "Discovery", devices: [{ id: "desktop", name: "Desktop", width: 1000, height: 700 }], pages: [{ id: "home", name: "Home", states: [{ id: "default", name: "Default", entries: { desktop: { path: "index.html" } } }] }] }));
+  const file = path.join(design, "index.html");
+  await writeFile(file, "<!doctype html><h1>Initial</h1>");
+  app = await ReviewServer.start(startSchema.parse({ projectRoot: root, designRoot: design }));
+  const base = app.info().revisionId;
+  const comment = app.session.feedback.add("Change", { kind: "page", objectId: "home", stateId: "default", deviceId: "desktop", revisionId: base });
+  const batch = app.session.feedback.prepare("batch");
+  const claim = app.session.feedback.claim(batch.id, "fixture", "claim");
+  app.session.feedback.update(batch.id, claim.leaseToken, "modified", comment.id, "Updated", "instance");
+  const feedback = { batchId: batch.id, leaseToken: claim.leaseToken, idempotencyKey: "feedback", expectedBaseRevision: base };
+  async function fails(input, code) {
+    const before = app.session.active().id;
+    await assert.rejects(app.publish(input), e => e.code === code);
+    assert.equal(app.session.active().id, before);
+    assert.equal((await readdir(path.join(app.session.dataRoot, "revisions"))).length, before === base ? 1 : 2);
+  }
+  process.env.RUYI_DESIGN_BROWSER_EXECUTABLE = path.join(root, "missing");
+  await fails(feedback, "validation_unavailable");
+  process.env.RUYI_DESIGN_BROWSER_EXECUTABLE = doctor.browser.path;
+  await writeFile(file, '<!doctype html><script>throw Error("broken")</script>');
+  await fails(feedback, "validation_failed");
+  await writeFile(file, '<!doctype html><script src="missing.js"></script>');
+  await fails(feedback, "validation_failed");
+  await writeFile(file, "<!doctype html><h1>Feedback published</h1>");
+  const revision = await app.publish(feedback);
+  const direct = { source: "conversation", request: "Update directly", idempotencyKey: "direct", expectedBaseRevision: revision.id };
+  const comments = app.session.context().comments;
+  process.env.RUYI_DESIGN_BROWSER_EXECUTABLE = path.join(root, "missing");
+  await fails(direct, "validation_unavailable");
+  process.env.RUYI_DESIGN_BROWSER_EXECUTABLE = doctor.browser.path;
+  await writeFile(file, '<!doctype html><script>throw Error("broken direct")</script>');
+  await fails(direct, "validation_failed");
+  await writeFile(file, '<!doctype html><script src="missing.js"></script>');
+  await fails(direct, "validation_failed");
+  await writeFile(file, "<!doctype html><h1>Conversation published</h1>");
+  await app.publish(direct);
+  assert.deepEqual(app.session.context().comments, comments);
+  console.log(`Browser discovery passed: ${fallback.source} ${fallback.version}, PATH system discovery, explicit executable without bundled browser, doctor exit/legacy field, feedback/conversation success and atomic failure protection.`);
+} finally {
+  await app?.close();
+  for (const key of Object.keys(process.env)) if (!(key in saved)) delete process.env[key];
+  Object.assign(process.env, saved);
+  await rm(root, { recursive: true, force: true });
+}

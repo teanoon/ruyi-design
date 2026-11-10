@@ -2,6 +2,7 @@
 import { parseArgs } from "node:util";
 import { existsSync } from "node:fs";
 import { chromium } from "playwright";
+import { diagnoseBrowser } from "../core/browser/index.js";
 import { setup, packageRoot } from "../skills/index.js";
 import { loadCatalog } from "../core/catalog/index.js";
 import path from "node:path";
@@ -43,6 +44,7 @@ try {
       ),
       bridge: existsSync(path.join(packageRoot, "dist/bridge/bridge.js")),
       chromium: existsSync(chromium.executablePath()),
+      browser: await diagnoseBrowser(),
       browserInstall: "npx playwright install chromium",
     };
     if (values.design) {
@@ -54,7 +56,7 @@ try {
       };
     }
     console.log(JSON.stringify(result, null, 2));
-    if (!result.workspace || !result.bridge || !result.chromium)
+    if (!result.workspace || !result.bridge || !result.browser.available)
       process.exitCode = 1;
   } else
     console.log(

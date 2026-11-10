@@ -12,7 +12,7 @@ const client=new Client({name:'conversation-sdk-test',version:'1'});let browser;
 const raw=(name,args)=>client.callTool({name,arguments:args},undefined,{timeout:120000});
 async function call(name,args){const r=await raw(name,args),v=r.structuredContent??JSON.parse(r.content[0].text);assert(!r.isError,JSON.stringify(v));return v}
 try{
- await client.connect(new StdioClientTransport({command:process.execPath,args:[path.resolve('dist/cli/index.js'),'mcp'],stderr:'pipe'}));
+ await client.connect(new StdioClientTransport({command:process.execPath,args:[path.resolve('dist/cli/index.js'),'mcp'],stderr:'pipe',env:process.env}));
  const tools=(await client.listTools()).tools;assert.equal(tools.length,9);assert(tools.find(t=>t.name==='ruyi_design_publish_revision').inputSchema.properties.source);
  const info=await call('ruyi_design_start_review',{projectRoot:root,designRoot:design}),sid={sessionId:info.sessionId};
  browser=await chromium.launch();const page=await browser.newPage();await page.goto(info.reviewUrl);const frame=()=>page.frameLocator('iframe').first();

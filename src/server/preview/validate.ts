@@ -1,18 +1,10 @@
-import { chromium } from "playwright";
+import { launchValidationBrowser } from "../../core/browser/index.js";
 import { combinations } from "../../contracts/catalog.js";
 import type { Revision } from "../../core/revisions/index.js";
-import { ReviewError, ensure } from "../../core/errors.js";
+import { ensure } from "../../core/errors.js";
 
 export async function validateRevision(revision: Revision, base: string) {
-  let browser;
-  try {
-    browser = await chromium.launch({ headless: true });
-  } catch {
-    throw new ReviewError(
-      "validation_unavailable",
-      "Chromium is unavailable. Run: npx playwright install chromium",
-    );
-  }
+  const { browser } = await launchValidationBrowser();
   try {
     for (const combo of combinations(revision.manifest)) {
       const device = revision.manifest.devices.find(

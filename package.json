@@ -13,6 +13,7 @@
   "files": [
     "dist",
     "!dist/**/*.tgz",
+    "!dist/release-*.json",
     "skills",
     "schemas",
     "examples/starter",
@@ -38,7 +39,11 @@
     "test:archive": "node tests/browser/archive.mjs",
     "test:conversation": "node tests/browser/conversation.mjs",
     "test:shortcuts": "node tests/browser/shortcuts.mjs",
-    "pack:local": "npm pack --pack-destination dist"
+    "pack:local": "npm pack --pack-destination dist",
+    "release:prepare": "node scripts/release.mjs prepare",
+    "release:publish": "node scripts/release.mjs publish",
+    "test:discovery": "node tests/integration/browser-discovery.mjs",
+    "test:release": "node --test tests/release/*.test.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
@@ -54,5 +59,13 @@
     "@types/node": "24.19.2",
     "vite": "8.3.6",
     "vitest": "5.1.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/teanoon/ruyi-design.git"
   }
 }

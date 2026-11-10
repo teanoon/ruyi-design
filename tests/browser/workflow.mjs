@@ -2,10 +2,9 @@ import assert from "node:assert/strict";
 import { mkdtemp, cp, readFile, writeFile, rm, mkdir } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { chromium } from "playwright";
 
 export async function workflow({
   cli = path.resolve("dist/cli/index.js"),
@@ -18,6 +17,7 @@ export async function workflow({
     command: process.execPath,
     args: [cli, "mcp"],
     stderr: "pipe",
+    env: process.env,
   });
   let stderr = "";
   transport.stderr?.on("data", (b) => (stderr += b));
@@ -51,7 +51,8 @@ export async function workflow({
     const sid = { sessionId: info.sessionId };
     const initial = await call("ruyi_design_get_review_context", sid);
     assert.equal(initial.revision.id, info.revisionId);
-    browser = await chromium.launch({ headless: true });
+    const { launchValidationBrowser } = await import(pathToFileURL(path.resolve(path.dirname(cli), "../core/browser/index.js")).href);
+    ({ browser } = await launchValidationBrowser());
     const page = await browser.newPage({
       viewport: { width: 1440, height: 1050 },
     });

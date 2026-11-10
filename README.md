@@ -6,12 +6,13 @@ Requires Node.js 24 or later. This is a local release candidate; the package has
 
 ```bash
 npm install -D /absolute/path/to/ruyi-design/dist/littlehobby-ruyi-design-0.1.0.tgz
-npx playwright install chromium
 npx ruyi-design doctor
 npx ruyi-design setup --client codex --project /absolute/path/to/project
 ```
 
 Configure your coding client to launch `npx ruyi-design mcp` in the consumer project. The MCP process starts without an HTTP listener. Ask your client to create `design/manifest.json` and call `ruyi_design_start_review` with explicit absolute project/design paths. It returns the browser URL.
+
+Validation reuses installed Chrome, Edge or Chromium, then falls back to an existing Playwright Chromium. Set `RUYI_DESIGN_BROWSER_CHANNEL=chrome` (or `msedge`), or `RUYI_DESIGN_BROWSER_EXECUTABLE=/absolute/path/to/chromium`, to select explicitly. These settings are mutually exclusive and invalid explicit selections fail without fallback. Run `npx playwright install chromium` only if you need a browser installed in the MCP environment. `doctor` launches an isolated headless instance and reports its source, version and failed attempts. No automatic download occurs.
 
 - Pages: flat navigation, state/device dropdowns and keyboard shortcuts (C, ←/→, ↑/↓); deterministic, interactive entries.
 - Design system: tokens plus shared components; select a device and compare all applicable states together.
@@ -38,6 +39,8 @@ npm run test:package
 ```
 
 Local release archives are written to `dist/` by `npm run pack:local` (builds first through `prepack`). The package excludes existing `.tgz` files from its contents.
+
+For npm package release preparation, same-archive acceptance, manual first publication and subsequent GitHub OIDC publication, see [Releasing](docs/releasing.md). `npm run release:prepare` requires a clean committed checkout and performs checks plus a dry-run; uploading is a separate explicit command.
 
 Source layout: `src/cli`, `core`, `contracts`, `storage`, `mcp`, `server`, `browser`, and `skills`. The `skills/` directory is the authored skill source; `dist/` contains generated service, workspace, and bridge code. Only runtime assets, skills, schemas, examples, and documentation enter the tarball. There is no install lifecycle hook that modifies the consumer project.
 

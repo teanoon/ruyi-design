@@ -1,0 +1,98 @@
+name: Publish npm package
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact package version
+        required: true
+        type: string
+      ref:
+        description: main, full commit SHA reachable from main, or matching vVERSION tag
+        required: true
+        default: main
+        type: string
+      tag:
+        description: latest for stable; next or another non-latest tag for prerelease
+        required: true
+        default: latest
+        type: string
+      confirm_license_and_scope:
+        description: I approve public distribution under UNLICENSED and have scope permission
+        required: true
+        default: false
+        type: boolean
+permissions:
+  contents: read
+concurrency:
+  group: npm-release
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: github.repository == 'teanoon/ruyi-design' && github.ref == 'refs/heads/main' && inputs.confirm_license_and_scope
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.target.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - id: target
+        name: Validate target from trusted main
+        env:
+          RELEASE_REF: ${{ inputs.ref }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: node scripts/release-ref.mjs
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.target.outputs.sha }}
+          persist-credentials: false
+      - run: npm ci --ignore-scripts
+      - run: npx --no-install playwright install --with-deps chromium
+      - name: Prepare and accept one archive
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: node scripts/release.mjs prepare --version "$RELEASE_VERSION" --tag "$RELEASE_TAG"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: npm-release-${{ steps.target.outputs.sha }}
+          path: |
+            dist/littlehobby-ruyi-design-*.tgz
+            dist/release-*.json
+          if-no-files-found: error
+  publish:
+    needs: prepare
+    runs-on: ubuntu-latest
+    environment: npmjs
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - run: npm install --global npm@11.17.0 --ignore-scripts
+      - uses: actions/download-artifact@v4
+        with:
+          name: npm-release-${{ needs.prepare.outputs.sha }}
+          path: dist
+      - name: Upload accepted bytes and verify npmjs metadata
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          NODE_AUTH_TOKEN: ''
+          NPM_TOKEN: ''
+          NPM_CONFIG_USERCONFIG: /tmp/ruyi-empty-npmrc
+        run: |
+          touch "$NPM_CONFIG_USERCONFIG"
+          node scripts/release.mjs publish --manifest "dist/release-$RELEASE_VERSION.json" --confirm-license --confirm-scope --confirm-version "$RELEASE_VERSION"
