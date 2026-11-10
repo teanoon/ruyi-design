@@ -60,7 +60,7 @@ RUYI_DESIGN_HOST=0.0.0.0 RUYI_DESIGN_PORT=4173 RUYI_DESIGN_PREVIEW_PORT=4174 RUY
 
 ## Doctor 输出格式迁移
 
-本次 doctor 输出契约包含两项不兼容变化，适用于包含此变更的新版本：
+自 0.2.0 起，doctor 输出契约包含两项不兼容变化：
 
 - `npx ruyi-design doctor` 默认输出中文文本摘要，重定向或管道中也保持文本。原先直接解析默认 JSON 的脚本必须改为 `npx ruyi-design doctor --json`。
 - `browserInstall` 不再无条件存在：只有自动发现全部失败且建议中包含可选 Chromium 安装方案时才提供。调用方应检查字段存在性，或读取结构化 `recommendations`。
