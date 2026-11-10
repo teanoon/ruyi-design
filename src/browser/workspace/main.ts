@@ -1,3 +1,4 @@
+import { adjacent, bindShortcuts, isShortcutAction, type ShortcutAction } from "../../contracts/shortcuts.js";
 import { BRAND } from "../../contracts/brand.js";
 import "../styles/workspace.css";
 import { isBridgeMessage, type BridgeMessage } from "../../contracts/bridge.js";
@@ -42,6 +43,7 @@ let selection: Target | undefined;
 let editing: string | undefined;
 let activeCommentId: string | undefined;
 let mode = "element";
+let composerBeforePreview = false;
 let cursor = 0;
 let connected = false;
 type View = {
@@ -66,6 +68,7 @@ type Frame = {
   restore?: any;
   capture?: (value: any) => void;
   locate?: any;
+  shortcutIds?: Set<string>;
 };
 const frames = new Map<string, Frame>();
 let locateTimer: ReturnType<typeof setTimeout> | undefined;
@@ -115,6 +118,11 @@ function message(frame: Frame, type: BridgeMessage["type"], payload?: any) {
 }
 function choose(next: View) {
   clearTimeout(locateTimer);
+  const m = displayedRevision().manifest as Manifest;
+  if (next.kind === "component") {
+    const available = m.devices.filter(d => m.components.find(c => c.id === next.id)?.examples.some(e => e.entries[d.id]));
+    if (!available.some(d => d.id === next.device) && available.length) next = { ...next, device: available[0].id };
+  }
   view = next;
   const q = new URLSearchParams({
     session,
@@ -137,6 +145,7 @@ function renderNav() {
     const p = document.createElement("div");
     p.className = "nav-section";
     p.textContent = text;
+    if (text === "页面") { const count = document.createElement("span"); count.textContent = String(m.pages.length).padStart(2, "0"); p.append(count); }
     nav.append(p);
   };
   label("页面");
@@ -168,6 +177,14 @@ function renderNav() {
           : "nav-item",
       ),
     );
+  for (const item of nav.querySelectorAll("button")) {
+    if (item.classList.contains("active")) item.setAttribute("aria-current", "page");
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.classList.add("nav-icon"); svg.setAttribute("viewBox", "0 0 24 24"); svg.setAttribute("fill", "none"); svg.setAttribute("stroke", "currentColor"); svg.setAttribute("stroke-width", "1.6"); svg.setAttribute("aria-hidden", "true");
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", item.textContent === "设计令牌" ? "M12 5v14M5 12h14" : "M5 3h10l4 4v14H5ZM14 3v5h5M8 12h8M8 16h6");
+    svg.append(path); item.prepend(svg);
+  }
 }
 function frameCard(entry: any, target: Target, name: string, restore?: any) {
   const device = (displayedRevision().manifest as Manifest).devices.find(
@@ -228,12 +245,21 @@ function frameCard(entry: any, target: Target, name: string, restore?: any) {
   new ResizeObserver(resize).observe(fit);
 }
 function renderCanvas(restores = new Map<string, any>()) {
+  if (historicalRevision && mode === "experience") {
+    mode = "element";
+    if (composerBeforePreview) el("composer").hidden = false;
+    placeComposer();
+  }
   clearTimeout(locateTimer);
   el("history-banner").hidden = !historicalRevision;
   el("history-version").textContent = historicalRevision ? `正在查看原版本 ${historicalRevision.id.slice(0, 8)}` : "";
-  el("revision").textContent = (historicalRevision ? "原版本 " : "版本 ") + displayedRevision().id.slice(0, 8);
-  el<HTMLButtonElement>("preview-toggle").disabled = !!historicalRevision;
-  el("interaction-hint").textContent = historicalRevision ? "正在查看原版本，返回最新版本后可继续评论。" : mode === "experience" ? "预览中：直接操作设计稿体验交互。" : "点击元素添加评论，保存后在对话中告诉 AI 可以更新。";
+  renderVersion();
+  const previewButton = el<HTMLButtonElement>("preview-toggle");
+  previewButton.disabled = !!historicalRevision;
+  el("preview-key").hidden = !!historicalRevision;
+  if (historicalRevision) previewButton.removeAttribute("aria-keyshortcuts");
+  else previewButton.setAttribute("aria-keyshortcuts", "C");
+  renderMode();
   frames.clear();
   el("canvas").replaceChildren();
   const m = displayedRevision().manifest as Manifest;
@@ -253,6 +279,9 @@ function renderCanvas(restores = new Map<string, any>()) {
   devices.replaceChildren(...m.devices.filter((d) => available.includes(d.id)).map((d) => new Option(d.name, d.id)));
   devices.value = view.device;
   devices.disabled = view.kind === "tokens";
+  el("device-key").hidden = devices.disabled;
+  if (devices.disabled) devices.removeAttribute("aria-keyshortcuts");
+  else devices.setAttribute("aria-keyshortcuts", "ArrowLeft ArrowRight");
   el("eyebrow").textContent =
     view.kind === "page" ? "页面设计" : "设计系统";
   if (view.kind === "tokens") {
@@ -325,14 +354,12 @@ function renderCanvas(restores = new Map<string, any>()) {
       c.deviceId === view.device &&
       (c.kind === "component" || c.stateId === view.state),
   );
-  el("title").textContent =
-    view.kind === "page"
-      ? (m.pages.find((p) => p.id === view.id)?.name ?? "页面") +
-        " / " +
-        (m.pages
-          .find((p) => p.id === view.id)
-          ?.states.find((s) => s.id === view.state)?.name ?? "状态")
-      : (m.components.find((c) => c.id === view.id)?.name ?? "组件");
+  const title = el("title");
+  if (view.kind === "page") {
+    title.textContent = m.pages.find(p => p.id === view.id)?.name ?? "页面";
+    const stateTitle = document.createElement("span"); stateTitle.className = "state-title";
+    stateTitle.textContent = " / " + (page?.states.find(s => s.id === view.state)?.name ?? "状态"); title.append(stateTitle);
+  } else title.textContent = m.components.find(c => c.id === view.id)?.name ?? "组件";
   if (!all.length) {
     el("canvas").textContent =
       "该组合不可用，请选择其他状态或设备。";
@@ -354,6 +381,7 @@ function placeComposer() {
   } else el("comments").before(composer);
 }
 function compose(target: Target, comment?: any) {
+  archiveSelected = comment?.status === "resolved";
   selection = structuredClone(target);
   editing = comment?.id;
   activeCommentId = comment?.id;
@@ -362,6 +390,7 @@ function compose(target: Target, comment?: any) {
     `${target.kind} / ${target.objectId}${target.stateId ? " / " + target.stateId : ""}${target.exampleId ? " / " + target.exampleId : ""}`;
   el<HTMLTextAreaElement>("comment-text").value = comment?.text ?? "";
   placeComposer();
+  renderComments();
   el("comment-text").focus();
 }
 async function locateComment(comment: any, original = false) {
@@ -404,19 +433,22 @@ function locateInFrame(f: Frame) {
   message(f, "locate", f.locate);
   f.locate = undefined;
 }
-let archiveOpen = false;
+let archiveSelected = false;
 function renderComments() {
   const list = el("comments");
-  const existingArchive = list.querySelector<HTMLDetailsElement>("#archived-comments");
-  if (existingArchive) archiveOpen = existingArchive.open;
   list.before(el("composer"));
   list.replaceChildren();
   const comments = [...context.comments].reverse() as any[];
   const active = comments.filter((c) => c.status !== "resolved");
   const archived = comments.filter((c) => c.status === "resolved");
-  el("count").textContent = String(active.length);
+  el("count").textContent = String(archiveSelected ? archived.length : active.length);
+  el("active-tab").textContent = `进行中 ${active.length}`;
+  el("archive-tab").textContent = `已归档（${archived.length}）`;
+  el("active-tab").setAttribute("aria-pressed", String(!archiveSelected));
+  el("archive-tab").setAttribute("aria-pressed", String(archiveSelected));
   const activeList = document.createElement("div");
   activeList.id = "active-comments";
+  activeList.hidden = archiveSelected;
   if (!active.length) {
     const empty = document.createElement("p");
     empty.className = "hint";
@@ -424,15 +456,13 @@ function renderComments() {
     activeList.append(empty);
   }
   list.append(activeList);
-  const archive = document.createElement("details");
-  archive.id = "archived-comments";
-  archive.className = "comment-archive";
-  archive.open = archiveOpen;
-  const summary = document.createElement("summary");
-  summary.textContent = `已归档（${archived.length}）`;
   const archiveList = document.createElement("div");
-  archive.append(summary, archiveList);
-  if (archived.length) list.append(archive);
+  archiveList.id = "archived-comments";
+  archiveList.hidden = !archiveSelected;
+  if (!archived.length) {
+    const empty = document.createElement("p"); empty.className = "hint"; empty.textContent = "这里暂时没有归档评论。"; archiveList.append(empty);
+  }
+  list.append(archiveList);
   const statusNames: Record<string, string> = {
     draft: "待处理",
     submitted: "已纳入更新",
@@ -464,6 +494,7 @@ function renderComments() {
         button("编辑", () => compose(c.target, c)),
         button("删除", async () => {
           await api(`comments/${c.id}`, undefined, "DELETE");
+          if (editing === c.id) { el("composer").hidden = true; composerBeforePreview = false; editing = undefined; selection = undefined; }
           await refresh();
         }),
       );
@@ -477,12 +508,14 @@ function renderComments() {
       actions.append(
         button("确认解决", async () => {
           await api(`comments/${c.id}/review`, { action: "resolve" });
+          archiveSelected = true;
           await refresh();
         }),
       );
     if (c.status !== "resolved") {
       const archiveButton = button("归档", async () => {
         await api(`comments/${c.id}/review`, { action: "archive" });
+        archiveSelected = true;
         if (editing?.replace(/^reply:/, "") === c.id) {
           el("composer").hidden = true;
           editing = undefined;
@@ -500,6 +533,7 @@ function renderComments() {
       actions.append(
         button("重新打开", async () => {
           await api(`comments/${c.id}/review`, { action: "reopen" });
+          archiveSelected = false;
           await refresh();
         }),
       );
@@ -508,7 +542,8 @@ function renderComments() {
         compose(c.target);
         editing = `reply:${c.id}`;
         activeCommentId = c.id;
-        placeComposer();
+        archiveSelected = c.status === "resolved";
+        renderComments();
       }),
     );
     card.append(actions);
@@ -522,8 +557,7 @@ function renderComments() {
 }
 async function refresh() {
   context = await api("context");
-  el("revision").textContent = (historicalRevision ? "原版本 " : "版本 ") + displayedRevision().id.slice(0, 8);
-  el("project").textContent = context.revision.manifest.name;
+  renderVersion();
   renderComments();
 }
 window.addEventListener("message", (e) => {
@@ -543,11 +577,19 @@ window.addEventListener("message", (e) => {
     f.ready = true;
     if (f.target.kind === "component") message(f, "measure");
     message(f, "mode", historicalRevision ? "experience" : mode);
+    message(f, "shortcuts", availableShortcuts());
     if (f.restore) {
       const restore = f.restore;
       f.restore = undefined;
       message(f, "restore", restore);
     } else locateInFrame(f);
+  }
+  if (m.type === "shortcut" && isShortcutAction(m.payload?.action) && typeof m.payload.id === "string" && m.payload.id.length > 0 && m.payload.id.length <= 80) {
+    const seen = f.shortcutIds ??= new Set<string>();
+    if (seen.has(m.payload.id)) return;
+    seen.add(m.payload.id);
+    if (seen.size > 64) seen.delete(seen.values().next().value!);
+    if (availableShortcuts().includes(m.payload.action)) performShortcut(m.payload.action);
   }
   if (m.type === "resize" && f.target.kind === "component") {
     const height = m.payload?.height;
@@ -663,8 +705,8 @@ async function events() {
           cursor = result.nextCursor;
           el("activity").textContent =
             {
-              working: "AI 正在修改",
-              idle: "等待你告知 AI 更新",
+              working: "已连接 · AI 修改中",
+              idle: "已连接",
             }[result.activity as string] ?? "已连接";
           if (
             result.resyncRequired ||
@@ -680,30 +722,71 @@ async function events() {
     }
   }
 }
-el<HTMLSelectElement>("device").onchange = () =>
-  choose({ ...view, device: el<HTMLSelectElement>("device").value });
-el<HTMLSelectElement>("state").onchange = () => {
-  const state = (displayedRevision().manifest as Manifest).pages
-    .find((p) => p.id === view.id)!.states.find((s) => s.id === el<HTMLSelectElement>("state").value)!;
-  choose({ ...view, state: state.id,
-    device: state.entries[view.device] ? view.device : Object.keys(state.entries)[0] });
-};
-el("preview-toggle").onclick = () => {
-  mode = mode === "experience" ? "element" : "experience";
+function renderVersion() {
+  const id = displayedRevision().id as string;
+  const revision = el("revision");
+  revision.title = `${historicalRevision ? "原版本" : "版本"} ${id}`;
+  const full = document.createElement("span"), compact = document.createElement("span");
+  full.className = "revision-full"; full.textContent = id.slice(0, 8);
+  compact.className = "revision-compact"; compact.textContent = id.slice(0, 4);
+  revision.replaceChildren(full, compact);
+  el("revision-description").textContent = revision.title;
+}
+function renderMode() {
   const preview = mode === "experience";
-  el("preview-toggle").textContent = preview ? "退出预览" : "预览";
+  el("preview-label").textContent = preview ? "退出预览" : "预览";
   el("preview-toggle").setAttribute("aria-pressed", String(preview));
-  el("interaction-hint").textContent = preview ? "预览中：直接操作设计稿体验交互。" : "点击元素添加评论，保存后在对话中告诉 AI 可以更新。";
-  el("composer").hidden = true;
-  for (const f of frames.values()) message(f, "mode", mode);
-};
+  el("canvas-mode-text").textContent = historicalRevision ? "原版本 · 只读查看" : preview ? "预览模式 · 直接体验页面" : "元素评论 · 点击即可留下想法";
+  el("interaction-hint").textContent = historicalRevision ? "正在查看原版本，返回最新版本后可继续评论。" : preview ? "正在体验设计，退出预览后可选择元素评论。" : "选择画布中的元素，已有评论将在原位展开编辑。";
+}
+function togglePreview(): boolean {
+  if (!context || historicalRevision) return false;
+  const preview = mode !== "experience";
+  if (preview) { composerBeforePreview = !el("composer").hidden; el("composer").hidden = true; }
+  else if (composerBeforePreview) { el("composer").hidden = false; placeComposer(); }
+  mode = preview ? "experience" : "element";
+  placeComposer();
+  renderMode();
+  for (const f of frames.values()) { message(f, "mode", mode); message(f, "shortcuts", availableShortcuts()); }
+  return true;
+}
+function selectDevice(device?: string): boolean {
+  if (!device || view.kind === "tokens" || device === view.device || ![...el<HTMLSelectElement>("device").options].some(o => o.value === device)) return false;
+  choose({ ...view, device }); return true;
+}
+function selectState(id?: string): boolean {
+  if (!id || view.kind !== "page" || id === view.state) return false;
+  const target = (displayedRevision().manifest as Manifest).pages.find(p => p.id === view.id)?.states.find(s => s.id === id);
+  if (!target) return false;
+  choose({ ...view, state: target.id, device: target.entries[view.device] ? view.device : Object.keys(target.entries)[0] }); return true;
+}
+function shortcutDestination(action: ShortcutAction): string | undefined {
+  if (action.startsWith("device-")) return view.kind === "tokens" ? undefined : adjacent([...el<HTMLSelectElement>("device").options].map(o => o.value), view.device, action === "device-next" ? 1 : -1);
+  if (action.startsWith("state-")) return view.kind !== "page" ? undefined : adjacent([...el<HTMLSelectElement>("state").options].map(o => o.value), view.state ?? "", action === "state-next" ? 1 : -1);
+}
+function availableShortcuts(): ShortcutAction[] {
+  if (!context) return [];
+  return (["preview", "device-previous", "device-next", "state-previous", "state-next"] as ShortcutAction[]).filter(action => action === "preview" ? !historicalRevision : !!shortcutDestination(action));
+}
+function performShortcut(action: ShortcutAction): boolean {
+  if (!context) return false;
+  if (action === "preview") return togglePreview();
+  return action.startsWith("device-") ? selectDevice(shortcutDestination(action)) : selectState(shortcutDestination(action));
+}
+bindShortcuts(window, () => ({}), performShortcut);
+el<HTMLSelectElement>("device").onchange = () => { selectDevice(el<HTMLSelectElement>("device").value); };
+el<HTMLSelectElement>("state").onchange = () => { selectState(el<HTMLSelectElement>("state").value); };
+el("preview-toggle").onclick = () => { togglePreview(); };
+el("active-tab").onclick = () => { archiveSelected = false; renderComments(); };
+el("archive-tab").onclick = () => { archiveSelected = true; renderComments(); };
 el("cancel-comment").onclick = () => {
   el("composer").hidden = true;
+  composerBeforePreview = false;
   selection = undefined;
   editing = undefined;
 };
 el("comment-text").addEventListener("keydown", (e: KeyboardEvent) => {
-  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !e.isComposing) {
     e.preventDefault();
     el<HTMLFormElement>("composer").requestSubmit();
   }
@@ -720,6 +803,7 @@ el("composer").onsubmit = async (e) => {
     else if (editing) await api(`comments/${editing}`, { text }, "PATCH");
     else if (selection) await api("comments", { text, target: selection });
     el("composer").hidden = true;
+    composerBeforePreview = false;
     editing = undefined;
     await refresh();
     notice("评论已保存。请在 AI 对话中说：我已评论，可以更新。");

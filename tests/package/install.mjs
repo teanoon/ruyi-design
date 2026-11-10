@@ -1,17 +1,19 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { mkdtemp, rm, writeFile, readFile, access } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, readFile, access, mkdir } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import assert from "node:assert/strict";
 import { workflow } from "../browser/workflow.mjs";
 const exec = promisify(execFile),
   root = process.cwd();
-const { stdout } = await exec("npm", ["pack", "--json", "--ignore-scripts"], {
+await mkdir(path.join(root, "dist"), { recursive: true });
+const { stdout } = await exec("npm", ["pack", "--pack-destination", "dist", "--json", "--ignore-scripts"], {
   cwd: root,
 });
 const [pack] = JSON.parse(stdout);
-const tarball = path.resolve(pack.filename);
+const tarball = path.resolve(root, "dist", pack.filename);
+assert(pack.files.every(file => !file.path.endsWith(".tgz")), "Release archives must not be nested in the npm package");
 for (const file of pack.files)
   assert(
     !/^(src|tests|openspec|node_modules|\.codex-home|\.ruyi-design|\.ruyi-uxai|\.uxai-review)\//.test(
@@ -23,6 +25,7 @@ for (const expected of [
   "dist/cli/index.js",
   "dist/workspace/index.html",
   "dist/bridge/bridge.js",
+  "dist/contracts/shortcuts.js",
   "dist/workspace/ruyi-mark.svg",
   "dist/workspace/ruyi-mark-mono.svg",
   "dist/workspace/ruyi-wordmark.svg",
@@ -80,7 +83,7 @@ try {
     screenshot: false,
   });
   console.log(
-    `Tarball install passed: ${pack.filename}; ${pack.files.length} public files; consumer has no dev dependencies.`,
+    `Tarball install passed: dist/${pack.filename}; ${pack.files.length} public files; consumer has no dev dependencies.`,
   );
 } finally {
   await rm(temp, { recursive: true, force: true });

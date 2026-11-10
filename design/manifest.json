@@ -110,7 +110,8 @@
       "name": "按钮",
       "implementation": [
         "components/ui.js",
-        "components/styles.css"
+        "components/styles.css",
+        "components/examples.js"
       ],
       "examples": [
         {
@@ -200,7 +201,8 @@
       "name": "评论卡片",
       "implementation": [
         "components/ui.js",
-        "components/styles.css"
+        "components/styles.css",
+        "components/examples.js"
       ],
       "examples": [
         {
@@ -290,7 +292,8 @@
       "name": "页面导航",
       "implementation": [
         "components/ui.js",
-        "components/styles.css"
+        "components/styles.css",
+        "components/examples.js"
       ],
       "examples": [
         {
@@ -360,7 +363,8 @@
       "name": "修订提示",
       "implementation": [
         "components/ui.js",
-        "components/styles.css"
+        "components/styles.css",
+        "components/examples.js"
       ],
       "examples": [
         {
@@ -410,7 +414,8 @@
       "name": "设备与状态控件",
       "implementation": [
         "components/ui.js",
-        "components/styles.css"
+        "components/styles.css",
+        "components/examples.js"
       ],
       "examples": [
         {
@@ -463,7 +468,8 @@
         "components/styles.css",
         "assets/ruyi-mark.svg",
         "assets/ruyi-wordmark.svg",
-        "assets/ruyi-mark-mono.svg"
+        "assets/ruyi-mark-mono.svg",
+        "components/examples.js"
       ],
       "examples": [
         {

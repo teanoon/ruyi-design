@@ -1,3 +1,4 @@
+import { bindShortcuts, isShortcutAction, type ShortcutAction } from "../../contracts/shortcuts.js";
 import { BRAND, BRAND_COLORS } from "../../contracts/brand.js";
 import { isBridgeMessage, type BridgeMessage } from "../../contracts/bridge.js";
 
@@ -17,6 +18,7 @@ const stateApi = () => window.ruyiDesignReviewState ?? window.ruyiUxaiReviewStat
 if (config && window.parent !== window) {
   const frameId = window.name;
   let mode = "experience";
+  let allowedShortcuts = new Set<ShortcutAction>();
   let start: { x: number; y: number } | undefined;
   const send = (type: BridgeMessage["type"], payload?: any) =>
     window.parent.postMessage(
@@ -133,6 +135,9 @@ if (config && window.parent !== window) {
       document.fonts.ready.then(reportSize);
       document.addEventListener("load", reportSize, true);
       reportSize();
+    }
+    if (m.type === "shortcuts" && Array.isArray(m.payload)) {
+      allowedShortcuts = new Set(m.payload.filter(isShortcutAction));
     }
     if (m.type === "mode") {
       mode = m.payload;
@@ -323,4 +328,10 @@ if (config && window.parent !== window) {
     },
     true,
   );
+  bindShortcuts(window, () => ({ preview: mode === "experience", inCanvas: true }), action => {
+    if (!allowedShortcuts.has(action)) return false;
+    send("shortcut", { action, id: crypto.randomUUID() });
+    return true;
+  });
+
 }

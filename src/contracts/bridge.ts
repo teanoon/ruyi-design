@@ -5,6 +5,8 @@ export type BridgeMessage = {
   channel: typeof BRAND.bridgeChannel;
   frameId: string;
   type:
+    | "shortcut"
+    | "shortcuts"
     | "measure"
     | "resize"
     | "ready"
@@ -27,6 +29,8 @@ export function isBridgeMessage(value: unknown): value is BridgeMessage {
     m.channel === BRAND.bridgeChannel &&
     typeof m.frameId === "string" &&
     [
+      "shortcut",
+      "shortcuts",
       "measure",
       "resize",
       "ready",

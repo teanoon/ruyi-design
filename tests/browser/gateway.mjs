@@ -111,7 +111,7 @@ try {
   await page.getByRole("button", { name: "保存评论" }).click();
   await page.getByText("Gateway feedback", { exact: true }).waitFor();
   assert.equal(await page.getByRole("button", { name: "提交给 AI", exact: true }).count(), 0);
-  await page.getByText("1 条评论待处理", { exact: true }).waitFor();
+  await page.waitForFunction(() => document.getElementById("pending-count")?.textContent === "1 条评论待处理");
   assert.equal(app.session.context().comments.length, 1);
   assert.equal(app.session.context().batches.length, 0);
   assert.equal(app.session.context().activity, "idle");

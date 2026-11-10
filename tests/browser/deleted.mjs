@@ -34,14 +34,14 @@ try {
   await frame().getByText("将被删除的说明", { exact: true }).click();
   await page.getByLabel("评论内容").fill("删除说明");
   await page.getByRole("button", { name: "保存评论", exact: true }).click();
-  await page.getByText("1 条评论待处理", { exact: true }).waitFor();
+  await page.waitForFunction(() => document.getElementById("pending-count")?.textContent === "1 条评论待处理");
   const batch = await call("ruyi_design_prepare_update", { ...sid, idempotencyKey: "delete" });
   const lease = await call("ruyi_design_claim_batch", { ...sid, batchId: batch.id, owner: "test", idempotencyKey: "claim" });
   await writeFile(path.join(design, "index.html"), html.replace('<span data-review-id="remove-me">将被删除的说明</span>', ''));
   await call("ruyi_design_update_feedback", { ...sid, batchId: batch.id, leaseToken: lease.leaseToken, action: "modified", commentId: batch.items[0].id, message: "已删除说明", scope: "instance" });
   const revision = await call("ruyi_design_publish_revision", { ...sid, batchId: batch.id, leaseToken: lease.leaseToken, idempotencyKey: "publish", expectedBaseRevision: info.revisionId });
   await call("ruyi_design_set_feedback_location", { ...sid, commentId: batch.items[0].id, revisionId: revision.id, location: { kind: "deleted", container: { selector: "#actions", tag: "DIV" } } });
-  await page.getByText("版本 " + revision.id.slice(0, 8), { exact: true }).waitFor();
+  await page.locator("#revision .revision-full").filter({ hasText: revision.id.slice(0, 8) }).waitFor();
   // Reload once to ensure the comment's newly recorded location is loaded.
   await page.reload();
   await page.getByRole("button", { name: "定位", exact: true }).click();

@@ -12,6 +12,7 @@
   },
   "files": [
     "dist",
+    "!dist/**/*.tgz",
     "skills",
     "schemas",
     "examples/starter",
@@ -35,7 +36,9 @@
     "test:design": "node tests/browser/product-design.mjs",
     "test:editing": "node tests/browser/review-editing.mjs",
     "test:archive": "node tests/browser/archive.mjs",
-    "test:conversation": "node tests/browser/conversation.mjs"
+    "test:conversation": "node tests/browser/conversation.mjs",
+    "test:shortcuts": "node tests/browser/shortcuts.mjs",
+    "pack:local": "npm pack --pack-destination dist"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",

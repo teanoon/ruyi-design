@@ -19,8 +19,9 @@ try{
  const first=page.locator(`[data-comment-id="${unaddressed.id}"]`),second=page.locator(`[data-comment-id="${reopened.id}"]`);
  await first.getByRole('button',{name:'归档',exact:true}).click();await page.getByText('已归档（1）',{exact:true}).waitFor();
  assert.equal(f.comment(unaddressed.id).resolution,'archived');assert.equal(f.comment(unaddressed.id).results[0].action,'unaddressed');
+ await page.locator('#active-tab').click();
  await second.getByRole('button',{name:'归档',exact:true}).click();await page.getByText('已归档（2）',{exact:true}).waitFor();
- await page.locator('#archived-comments summary').click();await first.getByRole('button',{name:'重新打开',exact:true}).click();
+ await page.locator('#archive-tab').click();await first.getByRole('button',{name:'重新打开',exact:true}).click();
  await page.locator('#active-comments').locator(`[data-comment-id="${unaddressed.id}"]`).getByRole('button',{name:'归档',exact:true}).click();
  await page.getByText('已归档（2）',{exact:true}).waitFor();
  await page.reload();await page.getByText('已归档（2）',{exact:true}).waitFor();

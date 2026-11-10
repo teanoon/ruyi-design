@@ -24,7 +24,7 @@ try {
  for(const asset of ['ruyi-mark.svg','ruyi-mark-mono.svg','ruyi-wordmark.svg']){
   const response=await page.request.get(new URL(asset,app.internalBase).href);assert.equal(response.status(),200);
  }
- await page.getByText('小爱好出品',{exact:true}).waitFor();
+ await page.locator('.workspace-brand strong').waitFor();
  const frame=page.frames().find(f=>f.parentFrame());
  // Disable the new starter API to exercise the immutable legacy contract.
  await frame.evaluate(()=>{delete window.ruyiDesignReviewState;});

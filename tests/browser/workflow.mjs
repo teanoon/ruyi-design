@@ -67,7 +67,7 @@ export async function workflow({
     await page.getByLabel("评论内容").fill("增加登录按钮的留白。");
     await page.getByRole("button", { name: "保存评论" }).click();
     assert.equal(await page.getByRole("button", { name: "提交给 AI", exact: true }).count(), 0);
-    await page.getByText("1 条评论待处理", { exact: true }).waitFor();
+    await page.waitForFunction(() => document.getElementById("pending-count")?.textContent === "1 条评论待处理");
     const saved = await call("ruyi_design_get_review_context", sid);
     assert.equal(saved.comments.length, 1);
     assert.equal(saved.batches.length, 0);
@@ -120,7 +120,7 @@ export async function workflow({
     });
     assert.equal(rev.mode, "styles");
     await page
-      .getByText("版本 " + rev.id.slice(0, 8), { exact: true })
+      .locator("#revision .revision-full").filter({ hasText: rev.id.slice(0, 8) })
       .waitFor();
     assert.equal(
       await frame().locator("#email").inputValue(),
@@ -183,7 +183,7 @@ export async function workflow({
     });
     assert.equal(rev2.mode, "reload");
     await page
-      .getByText("版本 " + rev2.id.slice(0, 8), { exact: true })
+      .locator("#revision .revision-full").filter({ hasText: rev2.id.slice(0, 8) })
       .waitFor();
     await frame().locator("#email").waitFor();
     await page.waitForTimeout(300);
@@ -264,11 +264,11 @@ export async function workflow({
         fullPage: true,
       });
     }
-    const archive = page.locator(".comment-archive");
-    assert.equal(await archive.getAttribute("open"), null);
-    await archive.locator("summary").click();
+    const archive = page.locator("#archived-comments");
+    assert(await archive.isHidden());
+    await page.locator("#archive-tab").click();
     await archive.getByRole("button", { name: "重新打开", exact: true }).first().click();
-    await page.getByText("1 条评论待处理", { exact: true }).waitFor();
+    await page.waitForFunction(() => document.getElementById("pending-count")?.textContent === "1 条评论待处理");
     assert.equal((await call("ruyi_design_get_review_context", sid)).comments.filter(c => c.status === "draft").length, 1);
     assert.deepEqual(errors, []);
     await call("ruyi_design_end_review", sid);
