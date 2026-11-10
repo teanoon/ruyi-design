@@ -1,53 +1,133 @@
 # 如意设计 · Ruyi Design
 
-Repository-based HTML prototype review, delivered as one npm package. Connect an existing coding client through MCP, open the local workspace, collect feedback, and publish verified revisions without refreshing the workspace.
+**English** | [简体中文](README.zh-CN.md)
 
-Requires Node.js 24 or later. This is a local release candidate; the package has not been published; its license is UNLICENSED.
+## Screenshots & description
+
+**Build with your AI coding agent. Review in your browser.**
+
+Ruyi Design is a local workspace for reviewing interactive HTML/CSS/JS prototypes. Connect your coding client through MCP, explore pages across states and devices, and leave comments on the elements you want to change. Ask your agent to make an update, then review the verified revision in the same workspace.
+
+![Ruyi Design workspace showing a desktop dashboard, page and device navigation, and saved element feedback.](docs/screenshots/review-workspace.png)
+
+*The bundled Northstar demo, reviewed in Ruyi Design. The workspace UI shown here is in Chinese.*
+
+<details>
+<summary>Design system: compare component states</summary>
+
+![Shared button examples displayed together for comparison in the design system view.](docs/screenshots/component-states.png)
+
+*Pages, component examples and design tokens share the same repository assets.*
+
+</details>
+
+- **Review the whole flow.** Switch page states and device sizes, interact with the prototype, and compare shared components.
+- **Give feedback in context.** Comment on an element, revisit its original version, and keep resolved feedback in the archive.
+- **Iterate when you ask.** Your agent processes a round of feedback only after your request. Verified revisions appear automatically; failed validation keeps the previous version available.
+- **Keep your assets.** Prototypes remain ordinary HTML, CSS and JavaScript in your repository. The tool connects to your existing coding client and requires no separate model API key.
+
+## Get started
+
+You need **Node.js 24+** and a coding client that supports MCP. Run the following commands from the project whose designs you want to review.
+
+### 1. Install and check
 
 ```bash
-npm install -D /absolute/path/to/ruyi-design/dist/littlehobby-ruyi-design-0.1.0.tgz
+npm install -D @littlehobby/ruyi-design
 npx ruyi-design doctor
-npx ruyi-design setup --client codex --project /absolute/path/to/project
 ```
 
-Configure your coding client to launch `npx ruyi-design mcp` in the consumer project. The MCP process starts without an HTTP listener. Ask your client to create `design/manifest.json` and call `ruyi_design_start_review` with explicit absolute project/design paths. It returns the browser URL.
+Validation automatically tries installed Chrome, Edge, system Chromium, then an existing Playwright Chromium. If `doctor` cannot find a usable browser, install one in the environment running MCP and check again:
 
-Validation reuses installed Chrome, Edge or Chromium, then falls back to an existing Playwright Chromium. Set `RUYI_DESIGN_BROWSER_CHANNEL=chrome` (or `msedge`), or `RUYI_DESIGN_BROWSER_EXECUTABLE=/absolute/path/to/chromium`, to select explicitly. These settings are mutually exclusive and invalid explicit selections fail without fallback. Run `npx playwright install chromium` only if you need a browser installed in the MCP environment. `doctor` launches an isolated headless instance and reports its source, version and failed attempts. No automatic download occurs.
+```bash
+npx playwright install chromium
+npx ruyi-design doctor
+```
 
-- Pages: flat navigation, state/device dropdowns and keyboard shortcuts (C, ←/→, ↑/↓); deterministic, interactive entries.
-- Design system: tokens plus shared components; select a device and compare all applicable states together.
-- Feedback: save element comments, tell the agent when to update, then verify the published fixes. No submission button or agent monitoring.
-- Publication: source edits remain unpublished until all candidate entries pass browser validation; the workspace updates automatically.
-- Assets: ordinary HTML/CSS/JS in your repository, reusable without this tool or Git.
+For a specific browser, use either `RUYI_DESIGN_BROWSER_CHANNEL=chrome` / `msedge` or `RUYI_DESIGN_BROWSER_EXECUTABLE=/absolute/path/to/chromium`. Set only one. See [browser configuration](docs/getting-started.md) for WSL, containers and launch diagnostics.
 
-For a quick sample, copy `node_modules/@littlehobby/ruyi-design/examples/starter/design` into your project. The starter includes login, dashboard, project detail and settings across 13 page states, five shared components, 17 tokens, and desktop/mobile profiles. From this source repository, `npm run preview:starter` starts the sample through an MCP client and prints the review URL.
+### 2. Connect your coding client
 
-See [Getting started](docs/getting-started.md), [Asset contract](docs/asset-contract.md), [MCP integration](docs/mcp.md), and [Local service boundaries](docs/security.md).
+For Codex, install the project skill:
 
-Development:
+```bash
+npx ruyi-design setup --client codex --project /absolute/path/to/your/project
+```
+
+Add this connection to your Codex MCP configuration, replacing the absolute project path:
+
+```toml
+[mcp_servers.ruyi_design]
+command = "npx"
+args = ["--no-install", "ruyi-design", "mcp"]
+cwd = "/absolute/path/to/your/project"
+tool_timeout_sec = 120
+```
+
+Skill setup does not change your MCP configuration. Reconnect the client after adding the connection. Other MCP clients can launch the same `npx --no-install ruyi-design mcp` command from the consumer project; see [MCP integration](docs/mcp.md).
+
+### 3. Open a review
+
+Ask your agent:
+
+> Use Ruyi Design to review this project's `design/` directory. Reuse existing assets, or create an interactive prototype if none exists. Start the review with absolute project and design paths, then give me the review URL.
+
+Open the returned URL. Select a page, state and device; click an element to save a comment. Use **Preview** to interact with the prototype. After adding feedback, tell your agent:
+
+> I have added comments. Please update the design from the saved feedback and publish a verified revision in this same review session.
+
+The workspace updates after validation passes. Confirm the fixes in your browser. Comments saved during an update stay for the next round you request.
+
+For a ready-made example, ask your agent to copy `node_modules/@littlehobby/ruyi-design/examples/starter/design` into a new `design/` directory. The [Northstar starter](examples/starter/README.md) includes four pages, 13 page states, shared components, design tokens, and desktop/mobile layouts.
+
+## Let AI do it
+
+Copy this into your coding client and replace the design brief:
+
+```text
+Set up @littlehobby/ruyi-design in this project so I can review an
+interactive prototype of [describe your product, page or feature].
+
+1. Install the published npm package and run ruyi-design doctor.
+   If no usable browser is available, help me install or configure one
+   in the environment running MCP.
+2. Inspect this client's MCP configuration and add the ruyi_design
+   connection, preserving unrelated settings. For Codex, also install
+   the ruyi-design-review project skill. If I need to reconnect the
+   client, explain how and stop until the connection is available.
+3. Read ruyi-design://guides/review, ruyi-design://schemas/manifest
+   and ruyi-design://templates/manifest. Reuse existing design assets;
+   otherwise create design/manifest.json and HTML/CSS/JS assets for
+   the brief, with shared components and reproducible page states.
+4. Start the review with explicit absolute projectRoot and designRoot.
+   Return the review URL and stop. Wait for my request before processing
+   comments; do not monitor or automatically start another round.
+```
+
+You can also request a change directly in chat:
+
+> Make the primary action more prominent on mobile. Keep the current review session and saved comments, validate the change, and publish the revision there.
+
+<details>
+<summary>Develop from source</summary>
 
 ```bash
 npm ci --ignore-scripts
 npx playwright install chromium
 npm run typecheck
 npm run build
-npm run pack:local
 npm test
 npm run test:browser
-npm run test:shortcuts
-npm run test:package
 ```
 
-Local release archives are written to `dist/` by `npm run pack:local` (builds first through `prepack`). The package excludes existing `.tgz` files from its contents.
+`npm run preview:starter` opens the bundled consumer demo through MCP. `npm run preview:design` opens this product's own [design prototypes](design/README.md). The two reviews keep separate histories.
 
-For npm package release preparation, same-archive acceptance, manual first publication and subsequent GitHub OIDC publication, see [Releasing](docs/releasing.md). `npm run release:prepare` requires a clean committed checkout and performs checks plus a dry-run; uploading is a separate explicit command.
+Use `npm run pack:local` to build a local tarball in `dist/`. See [Releasing](docs/releasing.md) for npm package preparation and GitHub Actions publishing.
 
-Source layout: `src/cli`, `core`, `contracts`, `storage`, `mcp`, `server`, `browser`, and `skills`. The `skills/` directory is the authored skill source; `dist/` contains generated service, workspace, and bridge code. Only runtime assets, skills, schemas, examples, and documentation enter the tarball. There is no install lifecycle hook that modifies the consumer project.
+</details>
+
+[Getting started](docs/getting-started.md) · [MCP integration](docs/mcp.md) · [Asset contract](docs/asset-contract.md) · [Local service boundaries](docs/security.md) · [Migration](docs/migration-to-ruyi-design.md)
+
+Published as [@littlehobby/ruyi-design](https://www.npmjs.com/package/@littlehobby/ruyi-design). License: **UNLICENSED**.
 
 小爱好出品 · By LittleHobby · 让设计，更合心意。
-
-See [Brand guidelines](docs/brand-guidelines.md) and [Migration](docs/migration-to-ruyi-design.md) for naming and existing-project upgrades. The package name is reserved by project convention; no registry publication has been performed.
-
-## 本产品设计评审
-
-`design/` 是如意设计自身的交互设计稿，以工作区为核心，内含评论、归档和原版本查看，并提供设计系统及最终提交墙方印标志。运行 `npm run preview:design` 评审本产品；`preview:starter` 仅用于 Northstar 消费者 demo。两套评审独立保存历史，启动参数和网关说明位于源码仓库的 `design/README.md`；npm 包内可使用的示例见 [starter 说明](examples/starter/README.md)。
