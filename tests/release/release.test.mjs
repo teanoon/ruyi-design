@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { validateMetadata, registry, packageName, assertUnpublished, cleanCommit, command, artifactInfo, verifyArtifact, publish, publishArguments, verifyRemote, prepare } from "../../scripts/release.mjs";
+import { validateMetadata, registry, packageName, assertUnpublished, cleanCommit, command, artifactInfo, verifyArtifact, publish, publishArguments, verifyRemote, waitForRemote, prepare } from "../../scripts/release.mjs";
 import { releaseRef } from "../../scripts/release-ref.mjs";
 
 const pkg = JSON.parse(await readFile(new URL("../../package.json", import.meta.url), "utf8"));
@@ -112,4 +112,39 @@ test("remote verification rejects wrong integrity, version, name or dist-tag", (
   for (const change of [{ name: "wrong" }, { version: "wrong" }, { dist: { integrity: "wrong" } }])
     await assert.rejects(verifyRemote(manifest, response(200, data({ [pkg.version]: { ...version, ...change } }, { latest: pkg.version }))), /does not match/);
   await assert.rejects(verifyRemote(manifest, response(200, data({ [pkg.version]: version }, { latest: "wrong" }))), /does not match/);
+}));
+test("publication uploads once while npm scans a package or a new version", () => fixture(async ({ root, manifest, manifestPath, tarball }) => {
+  const uploads = [], responses = [response(404), response(404), response(200, data()), response(200, data({ [manifest.version]: { name: manifest.name, version: manifest.version, dist: { integrity: manifest.integrity } } }, { latest: manifest.version }))];
+  let elapsed = 0, reads = 0;
+  await publish({ root, manifestPath, confirmLicense: true, confirmScope: true, confirmVersion: manifest.version, env: {},
+    run: (file, args, options) => {
+      if (file === "git") return args[0] === "status" ? "" : manifest.commit;
+      if (file === "npm") { uploads.push(args); return ""; }
+      return command(file, args, options);
+    },
+    fetcher: () => responses[reads++](),
+    verificationOptions: { now: () => elapsed, sleep: async ms => { elapsed += ms; }, pollMs: 100, timeoutMs: 1000, log: () => {} },
+  });
+  assert.equal(reads, 4); assert.equal(elapsed, 200);
+  assert.deepEqual(uploads, [publishArguments(tarball, "latest")]);
+}));
+test("processing timeout preserves the accepted version and never uploads a second time", () => fixture(async ({ root, manifest, manifestPath }) => {
+  let elapsed = 0, uploads = 0;
+  await assert.rejects(publish({ root, manifestPath, confirmLicense: true, confirmScope: true, confirmVersion: manifest.version, env: {},
+    run: (file, args, options) => {
+      if (file === "git") return args[0] === "status" ? "" : manifest.commit;
+      if (file === "npm") { uploads++; return ""; }
+      return command(file, args, options);
+    },
+    fetcher: response(404),
+    verificationOptions: { now: () => elapsed, sleep: async ms => { elapsed += ms; }, pollMs: 100, timeoutMs: 250, log: () => {} },
+  }), /Upload was accepted.*Do not upload it again/);
+  assert.equal(uploads, 1); assert.equal(elapsed, 250);
+}));
+test("processing wait rejects mismatched integrity and registry failures immediately", () => fixture(async ({ manifest }) => {
+  let sleeps = 0;
+  const options = { sleep: async () => { sleeps++; }, log: () => {} };
+  await assert.rejects(waitForRemote(manifest, { ...options, fetcher: response(200, data({ [manifest.version]: { name: manifest.name, version: manifest.version, dist: { integrity: "wrong" } } }, { latest: manifest.version })) }), /integrity does not match/);
+  await assert.rejects(waitForRemote(manifest, { ...options, fetcher: response(503) }), /Registry check failed/);
+  assert.equal(sleeps, 0);
 }));

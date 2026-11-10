@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { setTimeout as delay } from "node:timers/promises";
 
 export const registry = "https://registry.npmjs.org/";
 export const packageName = "@littlehobby/ruyi-design";
@@ -64,11 +65,28 @@ export async function verifyArtifact(manifest, root, run = command) {
     throw new Error("Manifest has not passed all release checks");
   return tarball;
 }
-export async function verifyRemote(manifest, fetcher = fetch) {
-  const data = await registryPackage(fetcher);
+function verifyRemoteMetadata(manifest, data) {
   const version = data?.versions[manifest.version];
   if (version?.name !== manifest.name || version.version !== manifest.version || version.dist?.integrity !== manifest.integrity || data["dist-tags"][manifest.tag] !== manifest.version)
     throw new Error("Published name/version, dist-tag or integrity does not match; investigate registry state before retrying");
+}
+export async function verifyRemote(manifest, fetcher = fetch) {
+  verifyRemoteMetadata(manifest, await registryPackage(fetcher));
+}
+export async function waitForRemote(manifest, { fetcher = fetch, timeoutMs = 15 * 60 * 1000, pollMs = 30000, sleep = delay, now = Date.now, log = console.log } = {}) {
+  const deadline = now() + timeoutMs;
+  for (;;) {
+    const data = await registryPackage(fetcher);
+    if (data?.versions[manifest.version]) {
+      verifyRemoteMetadata(manifest, data);
+      return;
+    }
+    const remaining = deadline - now();
+    if (remaining <= 0)
+      throw new Error(`Upload was accepted but ${manifest.name}@${manifest.version} is not available yet. Do not upload it again; inspect npm processing status and verify the accepted artifact later.`);
+    log(`Upload accepted; waiting for npm processing of ${manifest.name}@${manifest.version}. No additional upload will be attempted.`);
+    await sleep(Math.min(pollMs, remaining));
+  }
 }
 export async function prepare({ root = process.cwd(), version, tag, run = command, fetcher = fetch } = {}) {
   const commit = cleanCommit(run, root);
@@ -98,7 +116,7 @@ export async function prepare({ root = process.cwd(), version, tag, run = comman
   console.log(`Release prepared without upload: ${output}\n${info.integrity}`);
   return manifest;
 }
-export async function publish({ root = process.cwd(), manifestPath, confirmLicense, confirmScope, confirmVersion, run = command, fetcher = fetch, env = process.env } = {}) {
+export async function publish({ root = process.cwd(), manifestPath, confirmLicense, confirmScope, confirmVersion, run = command, fetcher = fetch, env = process.env, verificationOptions = {} } = {}) {
   if (!confirmLicense || !confirmScope || !confirmVersion) throw new Error("Publishing requires --confirm-license --confirm-scope --confirm-version <version>");
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
   const pkg = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
@@ -111,7 +129,7 @@ export async function publish({ root = process.cwd(), manifestPath, confirmLicen
   // Recheck immediately before upload, after the network preflight.
   await verifyArtifact(manifest, root, run);
   run("npm", publishArguments(tarball, manifest.tag), { cwd: root });
-  await verifyRemote(manifest, fetcher);
+  await waitForRemote(manifest, { ...verificationOptions, fetcher });
   console.log(`Published and verified ${manifest.name}@${manifest.version} (${manifest.tag})`);
 }
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
