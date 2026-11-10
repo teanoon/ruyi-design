@@ -37,7 +37,19 @@ npm install -D @littlehobby/ruyi-design
 npx ruyi-design doctor
 ```
 
-Validation automatically tries installed Chrome, Edge, system Chromium, then an existing Playwright Chromium. If `doctor` cannot find a usable browser, install one in the environment running MCP and check again:
+Doctor defaults to a readable Chinese summary. An available Edge is sufficient; no extra browser installation is needed. For example (other checks also passed):
+
+```text
+检查结果：通过
+验证浏览器：Microsoft Edge 157.0.4341.42
+浏览器来源：系统安装
+浏览器启动验证：通过
+额外浏览器安装：不需要
+```
+
+Use `npx ruyi-design doctor --json` for scripts and `npx ruyi-design doctor --verbose` for the full candidate diagnostics. Existing scripts parsing the old default JSON must add `--json`; `browserInstall` is now optional. See [migration notes](docs/migration-to-ruyi-design.md#doctor-输出格式迁移).
+
+Validation automatically tries installed Chrome, Edge, system Chromium, then an existing Playwright Chromium. If all automatic candidates fail, configure an existing browser or optionally install Chromium in the environment running MCP and check again:
 
 ```bash
 npx playwright install chromium

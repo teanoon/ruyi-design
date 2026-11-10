@@ -24,7 +24,7 @@ try {
   assert(system.available); assert.equal(system.source, "system");
   process.env.RUYI_DESIGN_BROWSER_EXECUTABLE = chromium.executablePath();
   process.env.PLAYWRIGHT_BROWSERS_PATH = path.join(root, "no-bundled");
-  const doctor = JSON.parse((await exec(process.execPath, [path.resolve("dist/cli/index.js"), "doctor", "--project", root], { env: process.env })).stdout);
+  const doctor = JSON.parse((await exec(process.execPath, [path.resolve("dist/cli/index.js"), "doctor", "--json", "--project", root], { env: process.env })).stdout);
   assert.equal(doctor.chromium, false); assert(doctor.browser.available); assert.equal(doctor.browser.source, "explicit");
   await mkdir(design);
   await writeFile(path.join(design, "manifest.json"), JSON.stringify({ schemaVersion: 1, id: "discovery", name: "Discovery", devices: [{ id: "desktop", name: "Desktop", width: 1000, height: 700 }], pages: [{ id: "home", name: "Home", states: [{ id: "default", name: "Default", entries: { desktop: { path: "index.html" } } }] }] }));

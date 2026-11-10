@@ -56,3 +56,19 @@ RUYI_DESIGN_HOST=0.0.0.0 RUYI_DESIGN_PORT=4173 RUYI_DESIGN_PREVIEW_PORT=4174 RUY
 ## 回退
 
 停止新服务，恢复之前的包、配置和技能后重连；原地复用的旧目录仍在原路径，数据格式不变。若回退新建项目，旧服务必须显式传 `.ruyi-design/` 为 dataRoot，防止创建空库。需要恢复备份时先完整保留升级后数据，再停服恢复整个备份；不要混合两份数据库与快照。
+
+
+## Doctor 输出格式迁移
+
+本次 doctor 输出契约包含两项不兼容变化，适用于包含此变更的新版本：
+
+- `npx ruyi-design doctor` 默认输出中文文本摘要，重定向或管道中也保持文本。原先直接解析默认 JSON 的脚本必须改为 `npx ruyi-design doctor --json`。
+- `browserInstall` 不再无条件存在：只有自动发现全部失败且建议中包含可选 Chromium 安装方案时才提供。调用方应检查字段存在性，或读取结构化 `recommendations`。
+
+JSON 的 `status` 为 `ok` 或 `error`，对应退出码 0 或 1；`checks` 区分 `passed`、`failed` 和 `not_checked`。`chromium` 仍仅表示默认 Playwright 浏览器文件存在，不参与总体成功判定；请使用 `status` 和 `browser.available`。已采集的原有字段及完整 `browser.attempts` 保留。
+
+Edge 通过检查且其他必需检查成功时，默认摘要显示“检查结果：通过”、“Microsoft Edge”、“系统安装”和“额外浏览器安装：不需要”，即使 `chromium` 为 false 或先前 Chrome 尝试失败。`doctor --verbose` 显示完整候选诊断；底层错误中的安装提示属于历史诊断，当前操作以摘要中的建议为准。`doctor --json --verbose` 始终输出单个 JSON 对象。
+
+数据目录歧义和无效 `--design` 清单也会生成统一的失败报告。新目录显示“首次启动评审时创建”，不代表已创建或已验证写权限。出现多个数据目录时先确认应使用的目录；MCP `ruyi_design_start_review` 可显式指定 `dataRoot`，doctor 没有同名参数，也不会自动删除或合并目录。
+
+本次格式变更无需迁移评审数据或设计清单。自动发布工作流继续使用 package-only 验收，不运行 doctor 或浏览器检查。

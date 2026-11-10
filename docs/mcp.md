@@ -19,6 +19,8 @@ RUYI_DESIGN_BROWSER_CHANNEL = "chrome"
 
 Alternatively set `RUYI_DESIGN_BROWSER_EXECUTABLE` to an absolute Chromium executable path; do not set both. Doctor must run with the same environment for matching diagnostics. With neither set, validation discovers Chrome → Edge → system/PATH Chromium → installed Playwright Chromium. Invalid explicit configuration stops validation without fallback. MCP stdout remains reserved for protocol messages; validation diagnostics are returned as tool errors. Browser selection adds no MCP parameters or tools.
 
+Run `npx ruyi-design doctor` separately from the MCP process for a readable Chinese summary; a working system Edge is reported as Microsoft Edge with no additional installation needed. Use `doctor --verbose` to inspect candidate history or `doctor --json` for automation (`--json --verbose` remains pure JSON). JSON provides the overall `status`, individual `checks` and applicable `recommendations`; `chromium: false` alone is not a browser failure. Existing default-JSON consumers must add `--json`, and `browserInstall` is now conditional. See [doctor migration](migration-to-ruyi-design.md#doctor-输出格式迁移). These format flags apply to doctor; MCP stdout continues to carry only protocol messages.
+
 Use the locally installed package. The CLI itself does not infer the reviewed project from cwd: call `ruyi_design_start_review` with explicit absolute `projectRoot` and `designRoot`. No model API key or cloud service is required by this package.
 
 Tools:

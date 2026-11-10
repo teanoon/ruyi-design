@@ -100,7 +100,7 @@ try {
     assert((await mcp.readResource({ uri: "ruyi-design://guides/review" })).contents[0].text.includes("ruyi_design_publish_revision"));
   } finally { await mcp.close(); }
   if (browserChecks) {
-    const doctor = JSON.parse((await exec(binary, ["doctor"], { cwd: temp })).stdout);
+    const doctor = JSON.parse((await exec(binary, ["doctor", "--json"], { cwd: temp })).stdout);
     assert(doctor.workspace && doctor.browser.available);
     const { workflow } = await import("../browser/workflow.mjs");
     await workflow({ cli: path.join(installed, "dist/cli/index.js"), starter: path.join(installed, "examples/starter/design"), screenshot: false });

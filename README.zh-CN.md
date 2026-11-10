@@ -37,7 +37,19 @@ npm install -D @littlehobby/ruyi-design
 npx ruyi-design doctor
 ```
 
-验证会依次尝试已安装的 Chrome、Edge、系统 Chromium 和已有的 Playwright Chromium。如果 `doctor` 未找到可用浏览器，在运行 MCP 的环境中安装后再检查：
+`doctor` 默认显示清晰的中文摘要。Edge 可用就满足要求，无需额外安装浏览器。例如（其他检查也已通过）：
+
+```text
+检查结果：通过
+验证浏览器：Microsoft Edge 157.0.4341.42
+浏览器来源：系统安装
+浏览器启动验证：通过
+额外浏览器安装：不需要
+```
+
+脚本使用 `npx ruyi-design doctor --json`；排查候选尝试链使用 `npx ruyi-design doctor --verbose`。原先解析默认 JSON 的脚本必须增加 `--json`，`browserInstall` 也改为可选字段，见[迁移说明](docs/migration-to-ruyi-design.md#doctor-输出格式迁移)。
+
+验证会依次尝试已安装的 Chrome、Edge、系统 Chromium 和已有的 Playwright Chromium。如果自动候选全部失败，可以配置现有浏览器，也可以选择在运行 MCP 的环境中安装 Chromium 后再检查：
 
 ```bash
 npx playwright install chromium

@@ -22,9 +22,23 @@ Starting MCP, viewing an existing preview and saving comments do not launch a va
 
 To select explicitly, set either `RUYI_DESIGN_BROWSER_CHANNEL=chrome` (or `msedge`) or `RUYI_DESIGN_BROWSER_EXECUTABLE=/absolute/path/to/chromium`. Both together, empty values, relative paths and unsupported channels fail. Explicit selections never fall back. System/custom versions must pass an actual launch and script check. All validation runs in a separate headless instance with temporary context; it does not use your normal windows, profile or login state.
 
-`doctor` performs that same launch check, reports `browser.available`, source, version and attempts, then closes the browser. Its exit status requires the workspace, bridge and a usable browser. The legacy `chromium` boolean still only means the default Playwright executable exists, so it may be false while doctor succeeds with a system/custom browser. Discovery allows up to 10 seconds per candidate within a 30-second overall startup budget. Publication reports failures as `validation_unavailable` and keeps the active version.
+`doctor` performs that same launch check and closes the browser. It defaults to a readable Chinese text summary, including when redirected or piped. A usable Edge produces “检查结果：通过”, “Microsoft Edge”, “系统安装” and “额外浏览器安装：不需要”; earlier failed Chrome candidates do not appear in the default summary. Use:
 
-If discovery fails, install Chromium explicitly with `npx playwright install chromium` in the same environment/account as MCP, or configure an installed executable. Package installation and runtime discovery never download browsers. Run `npx playwright install-deps chromium` if your operating system is missing browser shared libraries.
+```bash
+npx ruyi-design doctor                  # readable summary
+npx ruyi-design doctor --verbose        # summary plus candidate diagnostics
+npx ruyi-design doctor --json           # one JSON object for scripts
+npx ruyi-design doctor --json --verbose # still pure JSON, full attempts retained
+npx ruyi-design doctor --design /absolute/path/to/design
+```
+
+Exit status is 0 when all required checks pass and 1 on failure. The workspace, bridge and browser must be usable; data directory resolution and an optional `--design` catalog must succeed. A new review data directory is marked “首次启动评审时创建”: doctor does not create it or verify future write permissions. Checks skipped after an earlier failure are `not_checked`.
+
+JSON includes `status` (`ok`/`error`), `summary`, per-item `checks`, structured `recommendations` and `browser.available`, name, source, version and full attempts. The legacy `chromium` boolean only means the default Playwright executable exists; it can be false while Edge passes. `browserInstall` appears only when an optional Chromium install is an applicable recommendation. Existing JSON consumers must add `--json`; see [migration notes](migration-to-ruyi-design.md#doctor-输出格式迁移).
+
+Verbose output labels earlier candidate failures as diagnostic history. Installation hints inside those raw errors are not current recommendations. Explicit browser configuration failures require fixing that configuration; they do not produce advice to install another browser. Discovery allows up to 10 seconds per candidate within a 30-second overall startup budget. Publication reports failures as `validation_unavailable` and keeps the active version.
+
+If automatic discovery fails, optionally install Chromium explicitly with `npx playwright install chromium` in the same environment/account as MCP, or configure an installed executable. Package installation and runtime discovery never download browsers. Run `npx playwright install-deps chromium` if your operating system is missing browser shared libraries.
 
 If the project already has `design/manifest.json`, keep its existing design assets. Otherwise copy the bundled starter directory into `design/`, or ask the coding agent to author a manifest and assets based on `ruyi-design://templates/manifest` and `ruyi-design://schemas/manifest`. The manifest validates object IDs and references as well as local entry files. A Git repository is optional.
 

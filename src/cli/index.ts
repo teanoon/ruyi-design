@@ -1,13 +1,9 @@
 #!/usr/bin/env node
 import { parseArgs } from "node:util";
-import { existsSync } from "node:fs";
-import { chromium } from "playwright";
-import { diagnoseBrowser } from "../core/browser/index.js";
-import { setup, packageRoot } from "../skills/index.js";
-import { loadCatalog } from "../core/catalog/index.js";
+import { setup } from "../skills/index.js";
+import { collectDoctor, doctorExitCode, renderDoctor } from "./doctor.js";
 import path from "node:path";
 import { BRAND } from "../contracts/brand.js";
-import { resolveDataRoot } from "../core/sessions/data-root.js";
 
 try {
   const { values, positionals } = parseArgs({
@@ -16,10 +12,12 @@ try {
       client: { type: "string" },
       project: { type: "string" },
       design: { type: "string" },
+      json: { type: "boolean" },
+      verbose: { type: "boolean" },
       help: { type: "boolean", short: "h" },
     },
   });
-  const command = positionals[0];
+  const command = values.help ? undefined : positionals[0];
   if (command === "mcp") {
     const { runMcp } = await import("../mcp/index.js");
     await runMcp();
@@ -34,33 +32,15 @@ try {
       ),
     );
   } else if (command === "doctor") {
-    const result: any = {
-      product: `${BRAND.product} · ${BRAND.englishName}`,
-      package: BRAND.packageName,
-      data: resolveDataRoot(path.resolve(values.project ?? process.cwd())),
-      node: process.version,
-      workspace: existsSync(
-        path.join(packageRoot, "dist/workspace/index.html"),
-      ),
-      bridge: existsSync(path.join(packageRoot, "dist/bridge/bridge.js")),
-      chromium: existsSync(chromium.executablePath()),
-      browser: await diagnoseBrowser(),
-      browserInstall: "npx playwright install chromium",
-    };
-    if (values.design) {
-      const m = await loadCatalog(path.resolve(values.design));
-      result.catalog = {
-        id: m.id,
-        pages: m.pages.length,
-        components: m.components.length,
-      };
-    }
-    console.log(JSON.stringify(result, null, 2));
-    if (!result.workspace || !result.bridge || !result.browser.available)
-      process.exitCode = 1;
+    const report = await collectDoctor({
+      project: path.resolve(values.project ?? process.cwd()),
+      design: values.design ? path.resolve(values.design) : undefined,
+    });
+    console.log(renderDoctor(report, values));
+    process.exitCode = doctorExitCode(report);
   } else
     console.log(
-      `${BRAND.product} · ${BRAND.englishName}\n${BRAND.signature} · ${BRAND.tagline}\n\n${BRAND.cli} mcp\n${BRAND.cli} setup --client codex --project <root>\n${BRAND.cli} doctor [--project <root>] [--design <directory>]`,
+      `${BRAND.product} · ${BRAND.englishName}\n${BRAND.signature} · ${BRAND.tagline}\n\n${BRAND.cli} mcp\n${BRAND.cli} setup --client codex --project <root>\n${BRAND.cli} doctor [--project <root>] [--design <directory>] [--json] [--verbose]\n\nDoctor 默认显示文本摘要；--json 输出机器可读 JSON；--verbose 显示完整候选诊断。`,
     );
 } catch (e: any) {
   console.error(e.message);
