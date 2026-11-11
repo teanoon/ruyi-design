@@ -2,12 +2,13 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { mkdtemp, mkdir, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readdir, rm, writeFile, readFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
 const exec = promisify(execFile);
 const cli = path.resolve("dist/cli/index.js");
+const pkg = JSON.parse(await readFile(new URL("../../package.json", import.meta.url), "utf8"));
 const project = await mkdtemp(path.join(os.tmpdir(), "doctor-cli-"));
 const env = { ...process.env, RUYI_DESIGN_BROWSER_CHANNEL: "invalid", RUYI_DESIGN_BROWSER_EXECUTABLE: "" };
 async function run(args = []) {
@@ -23,6 +24,8 @@ try {
   const normal = await run();
   assert.equal(normal.code, 1);
   assert.equal(normal.stderr, "");
+  assert(normal.stdout.includes(`本地安装包：${pkg.name}@${pkg.version}`));
+  assert(normal.stdout.includes("不代表已连接 MCP 的运行版本"));
   assert(normal.stdout.startsWith("如意设计 · Ruyi Design\n检查结果：失败\n"));
   assert(normal.stdout.includes("配置冲突"));
   assert(!normal.stdout.includes("playwright install"));
@@ -30,6 +33,7 @@ try {
   assert.deepEqual(await readdir(project), []);
   const json = await run(["--json"]);
   const report = JSON.parse(json.stdout);
+  assert.equal(report.packageVersion, pkg.version);
   assert.equal(json.code, 1);
   assert.equal(json.stderr, "");
   assert.equal(report.status, "error");

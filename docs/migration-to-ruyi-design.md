@@ -72,3 +72,11 @@ Edge 通过检查且其他必需检查成功时，默认摘要显示“检查结
 数据目录歧义和无效 `--design` 清单也会生成统一的失败报告。新目录显示“首次启动评审时创建”，不代表已创建或已验证写权限。出现多个数据目录时先确认应使用的目录；MCP `ruyi_design_start_review` 可显式指定 `dataRoot`，doctor 没有同名参数，也不会自动删除或合并目录。
 
 本次格式变更无需迁移评审数据或设计清单。自动发布工作流继续使用 package-only 验收，不运行 doctor 或浏览器检查。
+
+## 运行版本与重启确认
+
+新增的 MCP 握手版本来自进程启动时加载的包元数据；start_review、get_review_context 和受认证 HTTP 上下文增加 runtime（packageVersion、instanceId、pid、startedAt）。旧字段与九个工具保持兼容，无需迁移历史数据。关闭再打开评审但不退出后端进程时，instanceId 不变；真正的新进程使用新 instanceId，持久 sessionId 可以不变。
+
+先记录当前 live runtime，再升级客户端配置指向的安装包，由客户端重启并重连 MCP，再读取 runtime，核对目标版本与实例 ID 变化。doctor 新增 packageVersion，但仅表示该 doctor 命令加载的本地安装包，不代表现有 MCP 已升级；仅刷新浏览器也不能证明重启。旧服务没有 runtime 时，需要先升级并重启才能建立后续可比较的运行身份。完整步骤见 [MCP 版本核对](mcp.md#verify-the-running-version-and-a-restart)。
+
+新指南说明用户保存非空追加回复后，非活动批次评论自动重新打开，无需额外点击重开；排队/处理中的固定输入不变，发布后追加回复留待下一轮。两种情况均须用户主动要求 AI 更新。npm 升级不会覆盖消费者已有技能副本，请审核合并新的打包技能；setup 仍对差异报冲突，不静默覆盖定制内容。

@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { collectDoctor, doctorExitCode, renderDoctor } from "../../src/cli/doctor.js";
 import type { BrowserDiagnostics } from "../../src/core/browser/index.js";
+import { packageVersion } from "../../src/core/runtime.js";
 
 const edge: BrowserDiagnostics = {
   available: true, source: "system", channel: "msedge", version: "157.0.4341.42",
@@ -25,10 +26,13 @@ describe("doctor reports", () => {
   it("reports the Windows Edge fallback as success without irrelevant repairs", async () => {
     const deps = fixture();
     const report = await collectDoctor(options, deps);
+    expect(report.packageVersion).toBe(packageVersion);
     expect(report).toMatchObject({ status: "ok", chromium: false, workspace: true, bridge: true, recommendations: [], browser: { name: "Microsoft Edge", available: true, channel: "msedge" } });
     expect(report).not.toHaveProperty("browserInstall");
     expect(doctorExitCode(report)).toBe(0);
     const text = renderDoctor(report);
+    expect(text).toContain(`本地安装包：@littlehobby/ruyi-design@${packageVersion}`);
+    expect(text).toContain("不代表已连接 MCP 的运行版本");
     for (const expected of ["检查结果：通过", "Microsoft Edge 157.0.4341.42", "浏览器来源：系统安装", "无需额外安装浏览器", "首次启动评审时创建"]) expect(text).toContain(expected);
     for (const hidden of ["chromium", "Chrome", "npx playwright", "警告", "写权限"]) expect(text).not.toContain(hidden);
     const verbose = renderDoctor(report, { verbose: true });
@@ -45,6 +49,7 @@ describe("doctor reports", () => {
   it("fails missing resources but keeps the usable browser and gives only resource advice", async () => {
     const report = await collectDoctor(options, { ...fixture(), exists: () => false });
     expect(report.status).toBe("error");
+    expect(report.packageVersion).toBe(packageVersion);
     expect(doctorExitCode(report)).toBe(1);
     expect(report.checks.browser.status).toBe("passed");
     expect(report.recommendations.map(r => r.code)).toEqual(["restore_workspace", "restore_bridge"]);

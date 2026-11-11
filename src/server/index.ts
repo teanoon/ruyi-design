@@ -14,6 +14,7 @@ import type { Revision } from "../core/revisions/index.js";
 import { validateRequest } from "./security/index.js";
 import { validateRevision } from "./preview/validate.js";
 import { routedUrl } from "../contracts/urls.js";
+import { runtime } from "../core/runtime.js";
 import {
   gatewayHtml,
   gatewayJavaScript,
@@ -86,7 +87,11 @@ export class ReviewServer {
       previewUrl: this.previewBase,
       revisionId: this.session.active()!.id,
       guideUri: BRAND.guideUri,
+      runtime,
     };
+  }
+  context() {
+    return { ...this.session.context(), runtime };
   }
   private async listen(o: StartOptions) {
     // A port-selecting gateway has one browser origin and one sticky upstream.
@@ -191,7 +196,7 @@ export class ReviewServer {
     });
     const prefix = `/api/sessions/${this.session.id}`;
     this.control.get(`${prefix}/context`, async () => ({
-      ...this.session.context(),
+      ...this.context(),
       previewBase: this.previewBase,
       previewSandboxed: this.gatewayPreview,
     }));

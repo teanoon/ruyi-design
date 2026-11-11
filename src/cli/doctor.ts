@@ -6,12 +6,14 @@ import { diagnoseBrowser, type BrowserDiagnostics } from "../core/browser/index.
 import { loadCatalog } from "../core/catalog/index.js";
 import { resolveDataRoot } from "../core/sessions/data-root.js";
 import { packageRoot } from "../skills/index.js";
+import { packageVersion } from "../core/runtime.js";
 
 type Check = { status: "passed" | "failed" | "not_checked"; message?: string };
 type Recommendation = { code: string; message: string; command?: string };
 export interface DoctorReport {
   product: string;
   package: string;
+  packageVersion: string;
   node: string;
   status: "ok" | "error";
   summary: string;
@@ -55,7 +57,7 @@ export async function collectDoctor(
   const workspace = deps.exists(path.join(deps.packageRoot, "dist/workspace/index.html"));
   const bridge = deps.exists(path.join(deps.packageRoot, "dist/bridge/bridge.js"));
   const report: DoctorReport = {
-    product: `${BRAND.product} · ${BRAND.englishName}`, package: BRAND.packageName,
+    product: `${BRAND.product} · ${BRAND.englishName}`, package: BRAND.packageName, packageVersion,
     node: deps.node, status: "error", summary: "", workspace, bridge,
     chromium: deps.exists(deps.bundledPath()),
     checks: {
@@ -134,6 +136,7 @@ export function renderDoctor(report: DoctorReport, options: { json?: boolean; ve
   if (options.json) return JSON.stringify(report, null, 2);
   const checkText = (check: Check) => check.status === "passed" ? "通过" : check.status === "failed" ? "失败" : "未检查";
   const lines = [report.product, `检查结果：${report.status === "ok" ? "通过" : "失败"}`, report.summary, "",
+    `本地安装包：${report.package}@${report.packageVersion}（当前 doctor 命令；不代表已连接 MCP 的运行版本）`,
     `工作区资源：${report.workspace ? "可用" : "缺失"}`, `桥接脚本：${report.bridge ? "可用" : "缺失"}`];
   const browser = report.browser;
   if (browser?.available) {

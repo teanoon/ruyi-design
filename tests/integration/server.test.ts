@@ -12,6 +12,7 @@ import os from "node:os";
 import path from "node:path";
 import { ReviewServer, startSchema } from "../../src/server/index.js";
 import { setup } from "../../src/skills/index.js";
+import { runtime } from "../../src/core/runtime.js";
 
 describe("HTTP workspace and revisions", () => {
   it("scopes hosts, origins, tokens, snapshots, explicit ports and restores after close", async () => {
@@ -29,6 +30,8 @@ describe("HTTP workspace and revisions", () => {
         }),
       );
       const info = server.info();
+      expect(info.runtime).toEqual(runtime);
+      expect(server.context().runtime).toEqual(info.runtime);
       expect(info.reviewUrl).not.toContain("0.0.0.0");
       const prefix = `/api/sessions/${info.sessionId}`;
       const authorization = `Bearer ${server.token}`;
@@ -62,6 +65,9 @@ describe("HTTP workspace and revisions", () => {
       ).toBe(200);
       expect(server.session.context().activity).toBe("idle");
       const headers = { host: new URL(server.base).host, authorization };
+      const context = (await server.control.inject({ url: `${prefix}/context`, headers })).json();
+      expect(context.runtime).toEqual(info.runtime);
+      expect(server.session.context()).not.toHaveProperty("runtime");
       const historical = await server.control.inject({ url: `${prefix}/revisions/${info.revisionId}`, headers });
       expect(historical.statusCode).toBe(200);
       expect(historical.json().manifest.pages[0].id).toBe("login");

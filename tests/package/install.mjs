@@ -8,6 +8,7 @@ import { createHash } from "node:crypto";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { artifactInfo } from "../../scripts/release.mjs";
+import { verifyRuntime } from "../integration/runtime-diagnostics.mjs";
 const exec = promisify(execFile),
   root = process.cwd();
 const { values, positionals } = parseArgs({ allowPositionals: true, options: { "skip-browser-checks": { type: "boolean" } } });
@@ -105,11 +106,13 @@ try {
   try {
     await mcp.connect(new StdioClientTransport({ command: process.execPath, args: [path.join(installed, "dist/cli/index.js"), "mcp"], cwd: temp, env: process.env, stderr: "pipe" }));
     assert.equal(mcp.getServerVersion().name, "ruyi-design-mcp");
+    assert.equal(mcp.getServerVersion().version, pkg.version);
     const tools = (await mcp.listTools()).tools;
     assert.equal(tools.length, 9);
     assert(tools.some(tool => tool.name === "ruyi_design_publish_revision"));
-    assert((await mcp.readResource({ uri: "ruyi-design://guides/review" })).contents[0].text.includes("ruyi_design_publish_revision"));
+    assert.equal((await mcp.readResource({ uri: "ruyi-design://guides/review" })).contents[0].text, await readFile(path.join(installed, "skills/ruyi-design-review/SKILL.md"), "utf8"));
   } finally { await mcp.close(); }
+  await verifyRuntime({ cli: path.join(installed, "dist/cli/index.js"), packageJson: path.join(installed, "package.json"), guidePath: path.join(installed, "skills/ruyi-design-review/SKILL.md") });
   if (browserChecks) {
     const doctor = JSON.parse((await exec(binary, ["doctor", "--json"], { cwd: temp })).stdout);
     assert(doctor.workspace && doctor.browser.available);

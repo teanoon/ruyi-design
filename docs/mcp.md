@@ -45,7 +45,7 @@ Opening review only starts the site and returns its URL. End that agent turn; do
 
 When the user says comments are ready and asks for updates: read context → `ruyi_design_prepare_update` → `ruyi_design_claim_batch` → read fixed inputs → edit → record each item → publish → report and end the turn. `ruyi_design_prepare_update` requires `sessionId` and `idempotencyKey`; optional `commentIds` limits the snapshot. Reuse the same key after a transport retry so later comments are not accidentally included. Empty pending input returns `empty_batch`. Recover earlier queued batches first; a valid processing lease owned by another worker is a conflict. New comments remain for the next explicit request.
 
-Leases last five minutes and renew through `ruyi_design_update_feedback(action="renew")`. Result scope is instance, component, or token. Only the browser user confirms resolution. For ambiguity, reply with `needs_clarification` and release the batch. The user replies, reopens the comment as pending, and asks the agent to update again. On interruption, reload context and reclaim expired work. There is no `wait_for_feedback` tool, browser batch submission endpoint, hook, or automatic agent wake-up.
+Leases last five minutes and renew through `ruyi_design_update_feedback(action="renew")`. Result scope is instance, component, or token. Only the browser user confirms resolution. For ambiguity, reply with `needs_clarification` and release the batch. The user saves a nonempty reply and asks the agent to update again. Outside queued/processing batches, that reply automatically reopens the comment; no extra reopen click is needed. Replies within an active batch leave its fixed input and status unchanged, then remain pending after publication for the next explicit request. On interruption, reload context and reclaim expired work. There is no `wait_for_feedback` tool, browser batch submission endpoint, hook, or automatic agent wake-up.
 
 ## Port-selecting gateway
 
@@ -60,3 +60,27 @@ Prototype frames use an opaque sandbox in this mode: scripts cannot access the p
 When the user explicitly asks for a design change in chat, read current context, edit the repository and call the existing `ruyi_design_publish_revision` with `sessionId`, `source: "conversation"`, `request` (the actual user request), `idempotencyKey` and `expectedBaseRevision`. Omit batchId/leaseToken. The service validates all entries, records source/request/base revision and publishes in the same session. Do not fabricate comments, create a second session or redirect review to a separate static path. Saved comments and archived results stay unchanged; use the feedback workflow when the user requests changes from saved comments.
 
 Queued/processing feedback blocks conversation publication, including feedback queued while validation is running. Finish or release that work first. Failed validation preserves the current version. Retries must reuse the same key, request and base revision; a new request requires a new key. Tool count remains nine.
+
+## Verify the running version and a restart
+
+The MCP handshake reports the package version loaded when this process starts. `ruyi_design_start_review` and `ruyi_design_get_review_context` return a read-only `runtime` object, also available from the authenticated session HTTP context:
+
+```json
+{
+  "packageVersion": "0.3.0",
+  "instanceId": "c948e960-dc6c-4a30-8e6f-c9d6f76dc519",
+  "pid": 12345,
+  "startedAt": "2026-11-11T12:00:00.000Z"
+}
+```
+
+The values above are illustrative. To verify an upgrade:
+
+1. Record the existing live runtime through the connected MCP.
+2. Upgrade the package used by that client's configured MCP command. `doctor` text and JSON (`packageVersion`) show the installation loaded by that doctor invocation, not the connected MCP process.
+3. Restart/reconnect the MCP through the client. Refreshing the browser alone does not restart the backend; a transport reconnect to the same process also does not create a new runtime instance.
+4. Call start_review for the same project again, or get_review_context for its restored session. Confirm the expected packageVersion and a different instanceId. The same process keeps its instanceId, pid and startedAt across repeated calls and reopened reviews. A persistent sessionId and historical comments/revisions can remain unchanged across process restarts.
+
+An old process keeps reporting its startup version even if its package files change on disk. Older servers without runtime cannot provide this proof; upgrade and restart through the client first, then use the new fields for later comparisons. Runtime fields do not include credentials and are not written to review history.
+
+The MCP guide is read from the packaged skill. Existing project-local skills are copies and are not automatically updated by npm upgrades. Review the new packaged skill and merge its changes into your existing copy; setup reports differing content rather than silently overwriting customizations.

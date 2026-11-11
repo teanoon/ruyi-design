@@ -69,3 +69,9 @@ Close a review with MCP `ruyi_design_end_review`, or stop its client process. Ne
 The browser also provides **归档** for comments that no longer require work, including unchanged results and reopened drafts. Manual archiving preserves the original result and does not claim a verified fix; **确认解决** remains for published changes. Queued/processing feedback must finish or be released before archiving. Reopen and archive again at any time after processing ends.
 
 You can also ask for changes directly in the AI conversation, without first leaving a browser comment. The agent publishes that explicit request as a new revision of the same session using the conversation mode of publish_revision. Your existing comments, archive and history remain intact.
+
+## Follow-up feedback and upgrades
+
+Saving a nonempty reply to reviewed or archived feedback automatically reopens it outside queued/processing batches, preserving its text, anchors and history. You do not need to click Reopen as well. Replies made while that comment belongs to a queued/processing batch do not change its fixed input; after publication they remain pending for the next explicit update request. Automatic reopening never starts the agent: tell it when you want another update. Manual Reopen remains useful when you want to reopen without adding a reply.
+
+For upgrade checks, doctor now includes the local `packageVersion` in JSON and shows the package/version in text. This is the installation running doctor, not proof of the connected MCP version. Record live runtime, upgrade the configured package, restart/reconnect the MCP through your client, and compare its new `runtime.packageVersion` and `runtime.instanceId`. The session ID can stay the same; see [the restart verification steps](mcp.md#verify-the-running-version-and-a-restart). Review and merge changes into existing project-local skills, which setup deliberately does not overwrite when they differ.

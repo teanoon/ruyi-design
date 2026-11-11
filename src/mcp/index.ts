@@ -9,13 +9,14 @@ import { ReviewServer, startSchema } from "../server/index.js";
 import { ensure } from "../core/errors.js";
 import { guide, packageRoot } from "../skills/index.js";
 import { feedbackLocationSchema } from "../contracts/feedback.js";
+import { packageVersion } from "../core/runtime.js";
 
 export function createMcp() {
   const mcp = new McpServer(
-    { name: BRAND.mcpName, version: "0.1.0" },
+    { name: BRAND.mcpName, version: packageVersion },
     {
       instructions:
-        "Read ruyi-design://guides/review. Start with explicit project paths. Only explicit user requests authorize changes. For saved feedback: read context, prepare/claim a batch, edit, record results and publish. For direct requests in chat: read context, edit and publish source=conversation with the actual request and base revision in the same session; never fabricate comments or create a separate preview. Saved comments never trigger work automatically. Do not poll or monitor. Only the user confirms fixes or archives comments.",
+        "Read ruyi-design://guides/review. Start with explicit project paths. Only explicit user requests authorize changes. For saved feedback: read context, prepare/claim a batch, edit, record results and publish. For direct requests in chat: read context, edit and publish source=conversation with the actual request and base revision in the same session; never fabricate comments or create a separate preview. Saved comments never trigger work automatically. Nonempty user follow-up replies automatically reopen comments outside queued/processing batches; do not ask for an extra reopen click. Replies during active batches remain for the next user-requested round after publication. Do not poll or monitor. Only the user confirms fixes or archives comments.",
     },
   );
   const sessions = new Map<string, ReviewServer>();
@@ -89,9 +90,9 @@ export function createMcp() {
   );
   tool(
     "ruyi_design_get_review_context",
-    "Read catalog, published revision, feedback and activity.",
+    "Read catalog, published revision, feedback, activity and live runtime identity. Compare runtime.instanceId and packageVersion to verify a process restart; sessionId can persist.",
     z.object(sid),
-    (args) => session(args.sessionId).session.context(),
+    (args) => session(args.sessionId).context(),
     true,
   );
   tool(
@@ -140,7 +141,7 @@ export function createMcp() {
   );
   tool(
     "ruyi_design_update_feedback",
-    "Renew lease, reply, ask a question, release for clarification or record modified/unaddressed result and instance/component/token scope.",
+    "Renew lease, reply, ask a question, release for clarification or record modified/unaddressed result and instance/component/token scope. After release, ask the user to save a reply and request another update; nonempty user replies reopen inactive feedback automatically.",
     z.object({
       ...sid,
       batchId: z.string(),
