@@ -1,6 +1,7 @@
 import { mountPageNavigation } from '../../../design/components/page-navigation.js';
 import '../../../design/components/page-navigation.css';
 import { adjacent, bindShortcuts, isShortcutAction, type ShortcutAction } from "../../contracts/shortcuts.js";
+import { commentActions, commentFacts, findElementComment, type CommentAction } from "../../contracts/comment-actions.js";
 import { BRAND } from "../../contracts/brand.js";
 import "../styles/workspace.css";
 import "../../../design/components/connection-status.css";
@@ -41,6 +42,7 @@ if (token) {
 }
 let context: any;
 let historicalRevision: any;
+let originalCommentId: string | undefined = params.get("comment") ?? undefined;
 const displayedRevision = () => historicalRevision ?? context.revision;
 let selection: Target | undefined;
 let editing: string | undefined;
@@ -91,7 +93,7 @@ async function api(route: string, body?: unknown, method?: string) {
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await r.json();
-  if (!r.ok) throw new Error(data.error?.message ?? r.statusText);
+  if (!r.ok) throw Object.assign(new Error(data.error?.message ?? r.statusText), { code: data.error?.code, details: data.error?.details });
   return data;
 }
 const button = (
@@ -135,7 +137,10 @@ function choose(next: View, reveal = false) {
     ...(view.state ? { state: view.state } : {}),
   });
   if (gatewayPort) q.set("port", gatewayPort);
-  if (historicalRevision) q.set("revision", historicalRevision.id);
+  if (historicalRevision) {
+    q.set("revision", historicalRevision.id);
+    if (originalCommentId) q.set("comment", originalCommentId);
+  }
   history.pushState(null, "", `?${q}`);
   renderNav(reveal);
   renderCanvas();
@@ -262,7 +267,7 @@ function renderCanvas(restores = new Map<string, any>()) {
   }
   clearTimeout(locateTimer);
   el("history-banner").hidden = !historicalRevision;
-  el("history-version").textContent = historicalRevision ? `正在查看原版本 ${historicalRevision.id.slice(0, 8)}` : "";
+  el("history-version").textContent = historicalRevision ? `正在查看评论原版本 · 只读 · ${historicalRevision.id.slice(0, 8)}` : "";
   renderVersion();
   const previewButton = el<HTMLButtonElement>("preview-toggle");
   previewButton.disabled = !!historicalRevision;
@@ -412,10 +417,16 @@ async function locateComment(comment: any, original = false) {
     (c.kind === "page" ? c.stateId === target.stateId : c.exampleId === target.exampleId),
   );
   if (!combo) {
+    if (!original) {
+      historicalRevision = undefined;
+      originalCommentId = undefined;
+      choose(latestAvailableView(), true);
+    }
     notice("评论对应的页面、状态或设备已不存在，原版本上下文仍保留。", "warning");
     return;
   }
   historicalRevision = original ? revision : undefined;
+  originalCommentId = original ? comment.id : undefined;
   // Reopen the declared entry even if an existing frame navigated elsewhere
   // during preview. Keep the comment's original revision and target immutable.
   choose({ kind: combo.kind, id: combo.objectId, device: combo.deviceId,
@@ -485,9 +496,12 @@ function renderComments() {
     card.className = "comment-card" + (activeCommentId === c.id ? " selected" : "");
     card.dataset.commentId = c.id;
     card.dataset.status = c.status;
+    card.tabIndex = -1;
     const head = document.createElement("div");
     head.className = "comment-meta";
-    head.textContent = `${c.target.objectId} · ${c.target.deviceId ?? "令牌"} · ${c.status === "resolved" && c.resolution === "archived" ? "已归档" : statusNames[c.status]}`;
+    const facts = commentFacts(c, context.batches);
+    const statusName = facts.busy ? (facts.processing ? "处理中" : "已纳入更新") : c.status === "resolved" && c.resolution === "archived" ? "已归档" : statusNames[c.status];
+    head.textContent = `${c.target.objectId} · ${c.target.deviceId ?? "令牌"} · ${statusName}`;
     const text = document.createElement("p");
     text.textContent = c.text;
     card.append(head, text);
@@ -499,62 +513,33 @@ function renderComments() {
     }
     const actions = document.createElement("div");
     actions.className = "comment-actions";
-    if (c.status === "draft") {
-      actions.append(
-        button("编辑", () => compose(c.target, c)),
-        button("删除", async () => {
-          await api(`comments/${c.id}`, undefined, "DELETE");
-          if (editing === c.id) { el("composer").hidden = true; composerBeforePreview = false; editing = undefined; selection = undefined; }
-          await refresh();
-        }),
-      );
-    }
-    if (c.target.context?.anchor?.selector)
-      actions.append(
-        button("定位", () => locateComment(c)),
-        button("查看原版本", () => locateComment(c, true)),
-      );
-    if (c.status === "awaiting_review")
-      actions.append(
-        button("确认解决", async () => {
-          await api(`comments/${c.id}/review`, { action: "resolve" });
-          await refresh();
-        }),
-      );
-    if (c.status !== "resolved") {
-      const archiveButton = button("归档", async () => {
-        await api(`comments/${c.id}/review`, { action: "archive" });
+    const labels: Record<CommentAction, string> = { locate: "定位", original: "查看原版本", edit: "编辑", delete: "删除", reply: "回复", resolve: "确认解决", reopen: "重新打开", cancel_reopen: "撤销重新打开" };
+    for (const action of commentActions(c, context.batches, context.revision.id)) {
+      actions.append(button(labels[action], async () => {
+        if (action === "locate" || action === "original") return locateComment(c, action === "original");
+        if (action === "edit") return compose(c.target, c);
+        if (action === "reply") {
+          compose(c.target);
+          editing = `reply:${c.id}`;
+          activeCommentId = c.id;
+          archiveSelected = c.status === "resolved";
+          renderComments();
+          el("comment-text").focus();
+          return;
+        }
+        if (action === "delete") await api(`comments/${c.id}`, undefined, "DELETE");
+        else await api(`comments/${c.id}/review`, { action });
         if (editing?.replace(/^reply:/, "") === c.id) {
           el("composer").hidden = true;
+          composerBeforePreview = false;
           editing = undefined;
           selection = undefined;
         }
+        if (action === "reopen") archiveSelected = false;
+        if (action === "cancel_reopen") archiveSelected = c.previousDraft?.status === "resolved";
         await refresh();
-      });
-      const busy = context.batches.some((b: any) =>
-        ["queued", "processing"].includes(b.status) && b.items.some((item: any) => item.id === c.id));
-      archiveButton.disabled = busy;
-      if (busy) archiveButton.title = "本轮处理完成后可以归档";
-      actions.append(archiveButton);
+      }, action === "resolve" ? "primary" : action === "delete" ? "danger" : ""));
     }
-    if (c.status !== "draft")
-      actions.append(
-        button("重新打开", async () => {
-          await api(`comments/${c.id}/review`, { action: "reopen" });
-          archiveSelected = false;
-          await refresh();
-        }),
-      );
-    actions.append(
-      button("新增评论", () => compose(c.target)),
-      button("回复", () => {
-        compose(c.target);
-        editing = `reply:${c.id}`;
-        activeCommentId = c.id;
-        archiveSelected = c.status === "resolved";
-        renderComments();
-      }),
-    );
     card.append(actions);
     (c.status === "resolved" ? archiveList : activeList).append(card);
   }
@@ -585,7 +570,7 @@ window.addEventListener("message", (e) => {
   if (m.type === "ready") {
     f.ready = true;
     if (f.target.kind === "component") message(f, "measure");
-    message(f, "mode", historicalRevision ? "experience" : mode);
+    message(f, "mode", historicalRevision ? "readonly" : mode);
     message(f, "shortcuts", availableShortcuts());
     if (f.restore) {
       const restore = f.restore;
@@ -611,20 +596,15 @@ window.addEventListener("message", (e) => {
   }
   if (m.type === "selection" && !historicalRevision) {
     const target = { ...f.target, context: m.payload };
-    const anchor = m.payload?.anchor;
-    const existing = [...context.comments].reverse().find((c: any) => {
-      const t = c.target, a = t.context?.anchor;
-      if (c.status === "resolved" || t.kind !== target.kind || t.objectId !== target.objectId || t.stateId !== target.stateId || t.deviceId !== target.deviceId || t.exampleId !== target.exampleId || !anchor?.selector || !a?.selector) return false;
-      return a.reviewId && anchor.reviewId ? a.reviewId === anchor.reviewId : a.selector === anchor.selector;
-    });
-    if (existing?.status === "draft") compose(existing.target, existing);
+    const existing = findElementComment(context.comments, target);
+    if (existing?.status === "draft" && !commentFacts(existing, context.batches).busy) compose(existing.target, existing);
     else if (existing) {
-      compose(existing.target);
-      editing = `reply:${existing.id}`;
       activeCommentId = existing.id;
+      archiveSelected = existing.status === "resolved";
       renderComments();
-      el("comment-text").focus();
-      notice("此评论已纳入更新，可在原位补充回复。");
+      const card = [...document.querySelectorAll<HTMLElement>(".comment-card")].find(card => card.dataset.commentId === existing.id);
+      card?.scrollIntoView({ block: "nearest" });
+      card?.focus({ preventScroll: true });
     } else compose(target);
   }
   if (m.type === "captured") {
@@ -826,13 +806,34 @@ el("composer").onsubmit = async (e) => {
     await refresh();
     notice("评论已保存。请在 AI 对话中说：我已评论，可以更新。");
   } catch (e: any) {
-    notice(e.message, "error");
+    if (e.code === "comment_exists" && e.details?.existingCommentId) {
+      await refresh();
+      notice("该元素已有评论，当前输入已保留。", "warning");
+      el("notice").append(button("在已有讨论中补充", () => {
+        const existing = context.comments.find((c: any) => c.id === e.details.existingCommentId);
+        if (!existing) return notice("已有评论已变化，请刷新后重试；当前输入仍保留。", "warning");
+        selection = existing.target;
+        editing = `reply:${existing.id}`;
+        activeCommentId = existing.id;
+        archiveSelected = existing.status === "resolved";
+        renderComments();
+        el("comment-text").focus();
+      }));
+    } else notice(e.message, "error");
   }
 };
-el("return-latest").onclick = () => {
-  historicalRevision = undefined;
-  choose(latestAvailableView(), true);
-  notice("已返回最新版本。");
+el("return-latest").onclick = async () => {
+  try {
+    await refresh();
+    const comment = context.comments.find((c: any) => c.id === originalCommentId);
+    if (comment) await locateComment(comment);
+    else {
+      historicalRevision = undefined;
+      originalCommentId = undefined;
+      choose(latestAvailableView(), true);
+      notice("已返回最新版本，原评论记录已不可用。", "warning");
+    }
+  } catch (error: any) { notice(error.message, "error"); }
 };
 window.onpopstate = async () => {
   const requestedUrl = location.href;
@@ -843,6 +844,7 @@ window.onpopstate = async () => {
       ? await api(`revisions/${encodeURIComponent(revisionId)}`) : undefined;
     if (location.href !== requestedUrl) return;
     historicalRevision = revision;
+    originalCommentId = p.get("comment") ?? undefined;
   } catch (e: any) {
     notice(e.message, "error");
     return;

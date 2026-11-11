@@ -102,7 +102,7 @@ export class ReviewServer {
       !o.previewBaseUrl;
     const errors = (err: any, _req: any, reply: any) =>
       reply.status(err.status ?? err.statusCode ?? 400).send({
-        error: { code: err.code ?? "invalid_request", message: err.message },
+        error: { code: err.code ?? "invalid_request", message: err.message, ...(err.details ? { details: err.details } : {}) },
       });
     this.control.setErrorHandler(errors);
     this.preview.setErrorHandler(errors);
@@ -247,7 +247,7 @@ export class ReviewServer {
     this.control.post(`${prefix}/comments/:id/review`, async (req) => {
       const b = z
         .object({
-          action: z.enum(["resolve", "archive", "reopen", "reply"]),
+          action: z.enum(["resolve", "archive", "reopen", "reply", "cancel_reopen"]),
           message: z.string().max(20000).default(""),
         })
         .parse(req.body);

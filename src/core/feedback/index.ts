@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { targetSchema, type Target } from "../../contracts/catalog.js";
 import { Store } from "../../storage/index.js";
-import { ensure } from "../errors.js";
+import { ensure, ReviewError } from "../errors.js";
+import { findElementComment, commentFacts } from "../../contracts/comment-actions.js";
 import { feedbackLocationSchema, type FeedbackLocation } from "../../contracts/feedback.js";
 
 export type Comment = {
@@ -54,6 +55,8 @@ export class Feedback {
       results: [],
     };
     this.store.transaction(() => {
+      const existing = findElementComment(this.store.all<Comment>("comment"), comment.target);
+      if (existing) throw new ReviewError("comment_exists", "This element already has a discussion", 409, { existingCommentId: existing.id });
       this.store.put("comment", comment);
       this.store.event("comment.created", comment);
     });
@@ -66,6 +69,8 @@ export class Feedback {
   }
   edit(id: string, text?: string) {
     const c = this.comment(id);
+    const facts = commentFacts(c, this.store.all<Batch>("batch"));
+    ensure(!facts.busy, "batch_active", "Wait until the current batch is released or published", 409);
     ensure(
       c.status === "draft",
       "not_draft",
@@ -80,11 +85,8 @@ export class Feedback {
       );
     this.store.transaction(() => {
       if (text === undefined) {
-        if (c.previousDraft) {
-          Object.assign(c, c.previousDraft);
-          delete c.previousDraft;
-          this.store.put("comment", c);
-        } else this.store.delete("comment", id);
+        ensure(!facts.hasHistory && !c.previousDraft, "comment_has_history", "Only a new, never-processed comment can be deleted", 409);
+        this.store.delete("comment", id);
       } else {
         c.text = text.trim();
         this.store.put("comment", c);
@@ -234,9 +236,12 @@ export class Feedback {
       return b;
     });
   }
-  review(id: string, action: "resolve" | "archive" | "reopen" | "reply", message = "") {
+  review(id: string, action: "resolve" | "archive" | "reopen" | "reply" | "cancel_reopen", message = "") {
     return this.store.transaction(() => {
       const c = this.comment(id);
+      const { busy } = commentFacts(c, this.store.all<Batch>("batch"));
+      if (action !== "reply") ensure(!busy, "batch_active", "Wait until the current batch is released or published", 409);
+      if (action === "reply") ensure(message.trim() && message.length <= 20000, "invalid_comment", "Reply must contain 1–20000 characters");
       if (message.trim())
         c.thread.push({ author: "user", text: message, at: Date.now() });
       if (action === "reply" && message.trim()) {
@@ -278,19 +283,13 @@ export class Feedback {
           "Comment is already a draft",
           409,
         );
-        ensure(
-          !this.store
-            .all<Batch>("batch")
-            .some(
-              (b) =>
-                b.status === "processing" && b.items.some((i) => i.id === id),
-            ),
-          "batch_processing",
-          "Wait until the current batch is released or published",
-          409,
-        );
         c.previousDraft = { text: c.text, status: c.status };
         c.status = "draft";
+      }
+      if (action === "cancel_reopen") {
+        ensure(c.status === "draft" && c.previousDraft, "not_reopened", "Comment has no reopened draft to cancel", 409);
+        Object.assign(c, c.previousDraft);
+        delete c.previousDraft;
       }
       this.store.put("comment", c);
       for (const b of this.store.all<Batch>("batch"))

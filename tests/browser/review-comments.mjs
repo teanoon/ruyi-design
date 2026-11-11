@@ -21,11 +21,13 @@ try {
  assert(await child.locator('p').isVisible());assert.equal(await child.locator('p').textContent(),'Child comment');
  await child.getByRole('button',{name:'编辑',exact:true}).click();await editor.fill('Unsaved edits');await page.getByRole('button',{name:'取消',exact:true}).click();
  assert.equal(await child.locator('p').textContent(),'Child comment');assert(await child.locator('p').isVisible());
- await child.getByRole('button',{name:'新增评论',exact:true}).click();assert.equal(await editor.inputValue(),'');await save('Second child comment');
- const comments=server.session.context().comments;assert.equal(comments.length,4);
- assert.equal(comments.filter(c=>c.target.context.anchor.selector==='#child').length,2);
- await page.locator('.comment-card').filter({hasText:'Second child comment'}).getByRole('button',{name:'归档',exact:true}).click();
- await page.getByText('已归档（1）',{exact:true}).waitFor();assert.equal(await page.locator('#active-tab').getAttribute('aria-pressed'),'true');
+ assert.equal(await page.getByRole('button',{name:'新增评论',exact:true}).count(),0);
+ assert.equal(await page.getByRole('button',{name:'归档',exact:true}).count(),0);
+ const childRecord=server.session.context().comments.find(c=>c.text==='Child comment');
+ server.session.feedback.review(childRecord.id,'archive');await page.reload();
+ await frame.locator('#child').click();assert.equal(await page.locator('#archive-tab').getAttribute('aria-pressed'),'true');
+ assert(await page.locator('#composer').isHidden());assert.equal(server.session.feedback.comment(childRecord.id).status,'resolved');
+ await page.locator('#active-tab').click();
  const feedback=server.session.feedback,batch=feedback.prepare('publish-comments'),claim=feedback.claim(batch.id,'test','claim');
  for(const item of batch.items)feedback.update(batch.id,claim.leaseToken,'modified',item.id,'Changed','instance');
  server.session.store.transaction(()=>feedback.published(batch.id,server.info().revisionId));await page.reload();
@@ -39,5 +41,6 @@ try {
  const afterReply=server.session.feedback.comment(reopenedId);assert.equal(afterReply.status,'draft');
  assert.equal(afterReply.text,beforeReply.text);assert.deepEqual(afterReply.results,beforeReply.results);
  assert.equal(afterReply.thread.at(-1).text,'追加反馈自动重新打开');
- console.log('Comment identity and editing passed: parent/child/middle are independent, same-element selection edits existing, cancellation retains saved text, multiple comments per element, archive/resolve retain active tab, follow-up replies reopen archived comments and show them in active.');
+ console.log('Comment identity and editing passed: parent/child/middle are independent, same-element selection edits existing, cancellation retains saved text, one discussion per element including archives, archive/resolve retain active tab, follow-up replies reopen archived comments and show them in active.');
 }finally{await browser.close();await server.close();await rm(root,{recursive:true,force:true})}
+await import('./comment-policy.mjs');

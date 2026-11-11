@@ -86,7 +86,7 @@ describe("durable review workflow", () => {
       f.review(c.id, "resolve");
       f.review(c.id, "reopen");
       f.edit(c.id, "Replacement draft");
-      f.edit(c.id);
+      f.review(c.id, "cancel_reopen");
       expect(f.comment(c.id).text).toBe("Original");
       expect(f.comment(c.id).status).toBe("resolved");
     }));
@@ -145,7 +145,7 @@ describe("durable review workflow", () => {
       expect(s.all("batch")).toHaveLength(0);
       const b = f.prepare("submit-1");
       expect(f.prepare("submit-1").id).toBe(b.id);
-      expect(() => f.edit(c.id, "changed")).toThrow("immutable");
+      expect(() => f.edit(c.id, "changed")).toThrow(expect.objectContaining({ code: "batch_active" }));
       const draft = f.add("Next round", target);
       expect(b.items).toHaveLength(1);
       expect(f.comment(draft.id).status).toBe("draft");

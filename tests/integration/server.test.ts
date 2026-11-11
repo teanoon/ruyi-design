@@ -15,6 +15,33 @@ import { setup } from "../../src/skills/index.js";
 import { runtime } from "../../src/core/runtime.js";
 
 describe("HTTP workspace and revisions", () => {
+  it("rejects concurrent duplicate comments and protects queued mutations through HTTP", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "ruyi-comment-http-"));
+    await cp("examples/starter/design", path.join(root, "design"), { recursive: true });
+    const server = await ReviewServer.start(startSchema.parse({ projectRoot: root, designRoot: path.join(root, "design") }));
+    try {
+      const manifest = server.session.active()!.manifest;
+      const page = manifest.pages[0], state = page.states[0], deviceId = Object.keys(state.entries)[0];
+      const target = { kind: "page", objectId: page.id, stateId: state.id, deviceId, revisionId: server.info().revisionId, context: { anchor: { selector: "#same" } } };
+      const prefix = `/api/sessions/${server.info().sessionId}`;
+      const headers = { host: new URL(server.base).host, authorization: `Bearer ${server.token}` };
+      const replies = await Promise.all(["One", "Two"].map(text => server.control.inject({ method: "POST", url: `${prefix}/comments`, headers, payload: { text, target } })));
+      expect(replies.map(r => r.statusCode).sort()).toEqual([200, 409]);
+      const c = server.session.context().comments[0];
+      expect(replies.find(r => r.statusCode === 409)!.json().error).toMatchObject({ code: "comment_exists", details: { existingCommentId: c.id } });
+      server.session.feedback.prepare("freeze-http");
+      for (const action of ["reopen", "cancel_reopen", "resolve", "archive"]) {
+        const result = await server.control.inject({ method: "POST", url: `${prefix}/comments/${c.id}/review`, headers, payload: { action } });
+        expect(result.statusCode).toBe(409);
+        expect(result.json().error.code).toBe("batch_active");
+      }
+      for (const method of ["PATCH", "DELETE"] as const) {
+        const result = await server.control.inject({ method, url: `${prefix}/comments/${c.id}`, headers, ...(method === "PATCH" ? { payload: { text: "Changed" } } : {}) });
+        expect(result.statusCode).toBe(409);
+      }
+      expect(server.session.feedback.comment(c.id).text).toBe(c.text);
+    } finally { await server.close(); await rm(root, { recursive: true, force: true }); }
+  });
   it("scopes hosts, origins, tokens, snapshots, explicit ports and restores after close", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "uxai-server-"));
     await cp("examples/starter/design", path.join(root, "design"), {

@@ -76,6 +76,8 @@ try {
   await frame().getByText("将被删除的说明", { exact: true }).waitFor();
   assert.equal(await page.locator("#history-banner").isVisible(), true);
   await page.getByRole("button", { name: "返回最新版本", exact: true }).click();
+  await page.locator("#history-banner").waitFor({state:"hidden"});
+  await page.getByText("已定位到保留的父容器：此处已删除。", {exact:true}).waitFor();
   await frame().getByRole("button", { name: "保存更改", exact: true }).waitFor();
   assert.equal(await frame().getByText("将被删除的说明", { exact: true }).count(), 0);
   assert.equal(await page.locator("#history-banner").isVisible(), false);

@@ -693,3 +693,8 @@ textarea {
     display: none
   }
 }
+
+.comment-actions button{white-space:nowrap;flex:0 0 auto;min-height:34px}
+.comment-actions button.primary{color:var(--color-on-primary,#fff);padding:4px 9px;margin-left:auto}
+.comment-actions button.danger{color:var(--color-danger)}
+.history-banner{position:sticky;top:8px;z-index:5}

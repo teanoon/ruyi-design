@@ -229,7 +229,7 @@ if (config && window.parent !== window) {
   document.addEventListener(
     "pointermove",
     (e) => {
-      if (mode === "experience") return;
+      if (mode === "experience" || mode === "readonly") return;
       if (mode === "region" && start)
         show({
           x: Math.min(start.x, e.clientX),
@@ -248,7 +248,7 @@ if (config && window.parent !== window) {
       // A select/input takes native focus on pointerdown, before our click
       // selection message reaches the comment composer. Suppress that default
       // in element mode as well as prototype pointer handlers.
-      if (mode === "element") {
+      if (mode === "element" || mode === "readonly") {
         e.preventDefault();
         e.stopImmediatePropagation();
       }
@@ -320,6 +320,13 @@ if (config && window.parent !== window) {
   document.addEventListener(
     "keydown",
     (e) => {
+      if (mode === "readonly" && e.target instanceof HTMLElement && e.target.matches("input,textarea,select,[contenteditable]")) {
+        if (e.key !== "Tab" && !((e.ctrlKey || e.metaKey) && ["a", "c"].includes(e.key.toLowerCase()))) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+        }
+        return;
+      }
       if (e.key === "Escape") {
         start = undefined;
         outline.style.display = "none";
@@ -335,6 +342,12 @@ if (config && window.parent !== window) {
     },
     true,
   );
+  document.addEventListener("beforeinput", e => {
+    if (mode === "readonly") { e.preventDefault(); e.stopImmediatePropagation(); }
+  }, true);
+  document.addEventListener("submit", e => {
+    if (mode === "readonly") { e.preventDefault(); e.stopImmediatePropagation(); }
+  }, true);
   bindShortcuts(window, () => ({ preview: mode === "experience", inCanvas: true }), action => {
     if (!allowedShortcuts.has(action)) return false;
     send("shortcut", { action, id: crypto.randomUUID() });

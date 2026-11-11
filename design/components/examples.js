@@ -2,7 +2,7 @@ import {button,icon,badge,commentCard,revisionBanner,deviceSelector,navigation,s
 export function componentExample(component, state='default') {
 const stages={
  button:()=>`<div class="showcase-buttons">${button(state==='loading'?'正在保存…':state==='disabled'?'保存评论':'保存评论',{variant:'primary',disabled:['loading','disabled'].includes(state),symbol:state==='success'?'check':''})}${button('查看原版本',{symbol:'history',disabled:state==='disabled'})}${button('取消',{variant:'text'})}</div>`,
- comment:()=>commentCard({text:'标题可以再松弛一点，增加行高。',status:state==='review'?'待复核':'待处理',archived:state==='archived',selected:state==='selected'}),
+ comment:()=>commentCard({text:'标题可以再松弛一点，增加行高。',status:({review:'待复核',queued:'已纳入更新',processing:'处理中',clarification:'待澄清',resolved:'已解决'})[state]||'待处理',archived:['archived','resolved'].includes(state),resolution:state==='resolved'?'confirmed':'archived',selected:state==='selected',busy:['queued','processing'].includes(state),reopened:state==='reopened',hasHistory:['reopened','released','review','resolved','archived'].includes(state),hasOriginal:['review','archived','resolved','reopened'].includes(state)}),
  navigation:()=>`<div style="max-width:240px">${button(state==='preview'?'退出预览':'预览',{shortcut:'C',variant:state==='preview'?'primary preview-button':'secondary preview-button',symbol:state==='preview'?'close':'play'})}${navigation(state==='selected'?'story':'home')}${shortcutHelp()}</div>`,
  revision:()=>revisionBanner(state==='deleted'?'deleted':'current'),
  selector:()=>deviceSelector(state==='mobile'?'mobile':'desktop')+shortcutHelp(),

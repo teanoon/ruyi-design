@@ -94,6 +94,7 @@ try {
  assert.equal(await search().inputValue(),'');assert.equal(await toggle('nav-0').getAttribute('aria-expanded'),'true');
  assert.equal(await nav.locator('[data-nav-node="moved-settings"]').count(),0);
  await page.getByRole('button',{name:'返回最新版本',exact:true}).click();
+ await nav.locator('[data-nav-node="moved-settings"] [aria-current="page"]').waitFor();
  assert.equal(await nav.locator('[data-nav-node="moved-settings"] [aria-current="page"]').isVisible(),true);
  await select('parent-0');await select('parent-1');await page.goBack();assert.equal(current(),'parent-0');
  await nav.locator('[data-page-id="parent-0"][aria-current="page"]').waitFor();

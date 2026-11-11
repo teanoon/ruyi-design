@@ -3,6 +3,7 @@ export class ReviewError extends Error {
     public code: string,
     message: string,
     public status = 400,
+    public details?: Record<string, unknown>,
   ) {
     super(message);
   }

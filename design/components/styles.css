@@ -30,3 +30,15 @@ kbd{font:10px/1.4 ui-monospace,SFMono-Regular,monospace;padding:1px 5px;border:1
 /* Align the footer rows and move the version indicator into the preview action. */
 .sidebar-footer{align-items:stretch}.sidebar-footer .connection-status{justify-content:flex-start;align-self:stretch}.sidebar-footer .workspace-brand{justify-content:start;align-self:stretch}.preview-version{font:10px/1.4 ui-monospace,monospace;padding:1px 4px;border:1px solid var(--color-control);border-radius:4px;color:var(--color-muted);background:var(--color-surface);flex:none}.preview-button.primary .preview-version{background:transparent;color:var(--color-on-primary);border-color:currentColor}
 @media(max-width:440px){.sidebar .preview-button{font-size:10px;padding:8px 6px;gap:3px}.sidebar .preview-button kbd{font-size:9px;padding:1px 2px}.preview-version{font-size:8px;padding:1px 3px}}
+
+/* State-appropriate comment actions stay visible, including on narrow screens. */
+.comment-actions .button{white-space:nowrap;flex:0 0 auto;min-height:34px}
+.comment-actions .button.primary{padding:4px 9px;margin-left:auto}
+.comment-actions .button.danger{color:var(--color-danger)}
+.comment-thread{display:flex;gap:9px;padding:8px 0;font-size:11px;line-height:1.7;overflow-wrap:anywhere}
+.comment-thread strong{flex:none;color:var(--color-primary)}
+.located-element{outline:2px solid var(--color-primary);outline-offset:4px}
+.deleted-note.located-element{outline:2px dashed var(--color-warning)}
+.canvas>.revision-banner[data-review-id="original-notice"]{position:sticky;top:8px;z-index:5;flex-wrap:wrap}
+[data-scene="feedback-original"] .sample-site{cursor:default}
+.sample-site .old-note{text-decoration:none}

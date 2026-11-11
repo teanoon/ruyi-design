@@ -118,6 +118,186 @@
               }
             }
           }
+        },
+        {
+          "id": "feedback-queued",
+          "name": "评论已纳入更新",
+          "entries": {
+            "desktop": {
+              "path": "pages/workbench.html",
+              "query": {
+                "state": "feedback-queued"
+              }
+            },
+            "mobile": {
+              "path": "pages/workbench.html",
+              "query": {
+                "state": "feedback-queued"
+              }
+            }
+          }
+        },
+        {
+          "id": "feedback-processing",
+          "name": "评论处理中",
+          "entries": {
+            "desktop": {
+              "path": "pages/workbench.html",
+              "query": {
+                "state": "feedback-processing"
+              }
+            },
+            "mobile": {
+              "path": "pages/workbench.html",
+              "query": {
+                "state": "feedback-processing"
+              }
+            }
+          }
+        },
+        {
+          "id": "feedback-clarification",
+          "name": "评论待澄清",
+          "entries": {
+            "desktop": {
+              "path": "pages/workbench.html",
+              "query": {
+                "state": "feedback-clarification"
+              }
+            },
+            "mobile": {
+              "path": "pages/workbench.html",
+              "query": {
+                "state": "feedback-clarification"
+              }
+            }
+          }
+        },
+        {
+          "id": "feedback-reopened",
+          "name": "评论重新打开",
+          "entries": {
+            "desktop": {
+              "path": "pages/workbench.html",
+              "query": {
+                "state": "feedback-reopened"
+              }
+            },
+            "mobile": {
+              "path": "pages/workbench.html",
+              "query": {
+                "state": "feedback-reopened"
+              }
+            }
+          }
+        },
+        {
+          "id": "feedback-released",
+          "name": "有历史的待处理评论",
+          "entries": {
+            "desktop": {
+              "path": "pages/workbench.html",
+              "query": {
+                "state": "feedback-released"
+              }
+            },
+            "mobile": {
+              "path": "pages/workbench.html",
+              "query": {
+                "state": "feedback-released"
+              }
+            }
+          }
+        },
+        {
+          "id": "feedback-resolved",
+          "name": "评论已解决",
+          "entries": {
+            "desktop": {
+              "path": "pages/workbench.html",
+              "query": {
+                "state": "feedback-resolved"
+              }
+            },
+            "mobile": {
+              "path": "pages/workbench.html",
+              "query": {
+                "state": "feedback-resolved"
+              }
+            }
+          }
+        },
+        {
+          "id": "feedback-archived",
+          "name": "历史归档评论",
+          "entries": {
+            "desktop": {
+              "path": "pages/workbench.html",
+              "query": {
+                "state": "feedback-archived"
+              }
+            },
+            "mobile": {
+              "path": "pages/workbench.html",
+              "query": {
+                "state": "feedback-archived"
+              }
+            }
+          }
+        },
+        {
+          "id": "feedback-original",
+          "name": "查看评论原版本",
+          "entries": {
+            "desktop": {
+              "path": "pages/workbench.html",
+              "query": {
+                "state": "feedback-original"
+              }
+            },
+            "mobile": {
+              "path": "pages/workbench.html",
+              "query": {
+                "state": "feedback-original"
+              }
+            }
+          }
+        },
+        {
+          "id": "feedback-legacy",
+          "name": "旧的重复评论",
+          "entries": {
+            "desktop": {
+              "path": "pages/workbench.html",
+              "query": {
+                "state": "feedback-legacy"
+              }
+            },
+            "mobile": {
+              "path": "pages/workbench.html",
+              "query": {
+                "state": "feedback-legacy"
+              }
+            }
+          }
+        },
+        {
+          "id": "feedback-deleted",
+          "name": "删除元素原版本对照",
+          "entries": {
+            "desktop": {
+              "path": "pages/workbench.html",
+              "query": {
+                "state": "feedback-deleted"
+              }
+            },
+            "mobile": {
+              "path": "pages/workbench.html",
+              "query": {
+                "state": "feedback-deleted"
+              }
+            }
+          }
         }
       ]
     }
@@ -299,6 +479,126 @@
               "query": {
                 "component": "comment",
                 "state": "archived"
+              }
+            }
+          }
+        },
+        {
+          "id": "queued",
+          "name": "已纳入更新",
+          "entries": {
+            "desktop": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "comment",
+                "state": "queued"
+              }
+            },
+            "mobile": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "comment",
+                "state": "queued"
+              }
+            }
+          }
+        },
+        {
+          "id": "processing",
+          "name": "处理中",
+          "entries": {
+            "desktop": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "comment",
+                "state": "processing"
+              }
+            },
+            "mobile": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "comment",
+                "state": "processing"
+              }
+            }
+          }
+        },
+        {
+          "id": "clarification",
+          "name": "待澄清",
+          "entries": {
+            "desktop": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "comment",
+                "state": "clarification"
+              }
+            },
+            "mobile": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "comment",
+                "state": "clarification"
+              }
+            }
+          }
+        },
+        {
+          "id": "reopened",
+          "name": "重新打开",
+          "entries": {
+            "desktop": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "comment",
+                "state": "reopened"
+              }
+            },
+            "mobile": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "comment",
+                "state": "reopened"
+              }
+            }
+          }
+        },
+        {
+          "id": "released",
+          "name": "有历史的待处理",
+          "entries": {
+            "desktop": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "comment",
+                "state": "released"
+              }
+            },
+            "mobile": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "comment",
+                "state": "released"
+              }
+            }
+          }
+        },
+        {
+          "id": "resolved",
+          "name": "已解决",
+          "entries": {
+            "desktop": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "comment",
+                "state": "resolved"
+              }
+            },
+            "mobile": {
+              "path": "showcases/index.html",
+              "query": {
+                "component": "comment",
+                "state": "resolved"
               }
             }
           }

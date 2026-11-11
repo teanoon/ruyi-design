@@ -111,10 +111,11 @@ try{
  await page.getByLabel('编辑评论',{exact:true}).fill('未保存的内容');
  await page.getByRole('button',{name:'取消',exact:true}).click();
  assert.equal(await originalCard.locator('p').first().textContent(),originalText);
- await originalCard.getByRole('button',{name:'新增评论',exact:true}).click();
- await page.getByLabel('添加元素评论',{exact:true}).fill('同一标题的第二条评论');
- await page.getByLabel('添加元素评论',{exact:true}).press('Control+Enter');
- assert.equal((await page.evaluate(()=>window.ruyiDesignReviewState.exportState())).comments.filter(c=>c.target==='headline').length,2);
+ assert.equal(await originalCard.getByRole('button',{name:'新增评论',exact:true}).count(),0);
+ await page.locator('[data-review-id="sample-headline"]').click();
+ assert.equal(await page.getByLabel('编辑评论',{exact:true}).inputValue(),originalText);
+ await page.getByRole('button',{name:'取消',exact:true}).click();
+ assert.equal((await page.evaluate(()=>window.ruyiDesignReviewState.exportState())).comments.filter(c=>c.target==='headline').length,1);
  // Review-gated shortcut prototype: exercise the inner design, not the runtime shell.
  await page.setViewportSize({width:1280,height:900});await page.goto(url(),{waitUntil:'networkidle'});
  const snapshot=()=>page.evaluate(()=>window.ruyiDesignReviewState.exportState());
@@ -161,9 +162,9 @@ try{
  await page.getByRole('button',{name:'按钮',exact:true}).click();assert.equal(await page.locator('#scene').count(),0);assert.equal(await page.locator('.component-example').count(),4);
  const componentState=(await snapshot()).sampleState;await press('ArrowDown');assert.equal((await snapshot()).sampleState,componentState);await press('ArrowLeft');assert.equal((await snapshot()).device,'desktop');await press('ArrowRight');assert.equal((await snapshot()).device,'mobile');
  await page.getByRole('button',{name:'设计令牌',exact:true}).click();assert.equal(await page.locator('.prototype-tokens article').count(),13);assert(await page.locator('#device').isDisabled());const tokens=await snapshot();await press('ArrowLeft');await press('ArrowUp');assert.deepEqual(await snapshot(),tokens);
- await page.getByRole('button',{name:'首页',exact:true}).click();await page.getByRole('button',{name:'查看原版本',exact:true}).first().click();await press('c');assert.equal((await snapshot()).preview,false);assert(await page.locator('[data-review-id="preview-toggle"]').isDisabled());await page.getByRole('button',{name:'返回最新版本',exact:true}).click();
- await page.locator('[data-review-id="comment-headline"]').getByRole('button',{name:'归档',exact:true}).click();assert.equal((await snapshot()).comments.find(c=>c.id==='headline').resolution,'archived');
- await page.getByRole('button',{name:/已归档/}).click();await page.locator('[data-review-id="comment-headline"]').getByRole('button',{name:'重新打开',exact:true}).click();await page.locator('[data-review-id="comment-headline"]').getByRole('button',{name:'归档',exact:true}).click();assert.equal((await snapshot()).comments.find(c=>c.id==='headline').resolution,'archived');
+ await page.goto(url('updated'));await page.getByRole('button',{name:'查看原版本',exact:true}).first().click();await press('c');assert.equal((await snapshot()).preview,false);assert(await page.locator('[data-review-id="preview-toggle"]').isDisabled());await page.getByRole('button',{name:'返回最新版本',exact:true}).click();
+ await page.locator('[data-review-id="comment-headline"]').getByRole('button',{name:'确认解决',exact:true}).click();assert.equal((await snapshot()).comments.find(c=>c.id==='headline').resolution,'confirmed');
+ await page.getByRole('button',{name:/已归档/}).click();await page.locator('[data-review-id="comment-headline"]').getByRole('button',{name:'重新打开',exact:true}).click();await page.locator('[data-review-id="comment-headline"]').getByRole('button',{name:'撤销重新打开',exact:true}).click();assert.equal((await snapshot()).comments.find(c=>c.id==='headline').status,'resolved');
  await page.getByRole('button',{name:/进行中/}).click();await page.getByRole('button',{name:'首页',exact:true}).click();
  for(const [width,device]of [[1280,'desktop'],[390,'mobile']]){
   await page.setViewportSize({width,height:900});await page.goto(url(),{waitUntil:'networkidle'});assert.equal(await page.locator('.keyboard-help').count(),0);
@@ -171,5 +172,5 @@ try{
   await page.screenshot({path:`test-results/product-design/shortcuts-${device}.png`,fullPage:true});
  }
  assert.deepEqual(errors,[]);
- console.log(`Ruyi product prototypes passed: ${rev.manifest.pages.length} page, ${combinations(rev.manifest).length} state/device entries; compact workspace, newest-first inline editing, Ctrl+Enter, archive, inline original version, one final contribution seal; keyboard modes, sparse valid combinations, deep links, draft protection, native/IME/modifier guards, component/token scope and independent archive on desktop/mobile.`);
+ console.log(`Ruyi product prototypes passed: ${rev.manifest.pages.length} page, ${combinations(rev.manifest).length} state/device entries; compact workspace, newest-first inline editing, Ctrl+Enter, archive, inline original version, one final contribution seal; keyboard modes, sparse valid combinations, deep links, draft protection, native/IME/modifier guards, component/token scope and confirm/reopen/cancel on desktop/mobile.`);
 }finally{await browser.close();await server.close();await rm(data,{recursive:true,force:true})}
