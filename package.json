@@ -3,7 +3,7 @@
   "version": "0.2.0",
   "description": "如意设计 · Ruyi Design — local interactive prototype preview and review",
   "type": "module",
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "engines": {
     "node": ">=24.0.0"
   },
@@ -18,6 +18,8 @@
     "schemas",
     "examples/starter",
     "docs",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
     "README.md",
     "README.zh-CN.md"
   ],

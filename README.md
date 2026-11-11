@@ -140,6 +140,10 @@ Use `npm run pack:local` to build a local tarball in `dist/`. See [Releasing](do
 
 [Getting started](docs/getting-started.md) · [MCP integration](docs/mcp.md) · [Asset contract](docs/asset-contract.md) · [Local service boundaries](docs/security.md) · [Migration](docs/migration-to-ruyi-design.md)
 
-Published as [@littlehobby/ruyi-design](https://www.npmjs.com/package/@littlehobby/ruyi-design). License: **UNLICENSED**.
+Published as [@littlehobby/ruyi-design](https://www.npmjs.com/package/@littlehobby/ruyi-design). License: [Apache License 2.0](LICENSE).
+
+Copyright 2026 LittleHobby. Unless otherwise stated, project-owned code and materials are licensed under Apache-2.0. Third-party materials retain their own licenses; see [third-party notices](THIRD_PARTY_NOTICES.md). This license does not grant rights to the Ruyi Design / LittleHobby trademarks, except as provided by the license.
+
+This repository update does not modify previously published npm archives or registry metadata. See the [licensing review](docs/licensing.md) for distribution details.
 
 小爱好出品 · By LittleHobby · 让设计，更合心意。

@@ -138,6 +138,10 @@ npm run test:browser
 
 [详细入门](docs/getting-started.md) · [MCP 集成](docs/mcp.md) · [资产契约](docs/asset-contract.md) · [本地服务边界](docs/security.md) · [迁移说明](docs/migration-to-ruyi-design.md)
 
-已发布至 npm：[@littlehobby/ruyi-design](https://www.npmjs.com/package/@littlehobby/ruyi-design)。许可证：**UNLICENSED**。
+已发布至 npm：[@littlehobby/ruyi-design](https://www.npmjs.com/package/@littlehobby/ruyi-design)。许可证：[Apache License 2.0](LICENSE)。
+
+Copyright 2026 LittleHobby。除另有说明外，项目自有代码与材料采用 Apache-2.0。第三方材料保留各自许可，详见[第三方声明](THIRD_PARTY_NOTICES.md)。除许可证明确允许的情形外，本许可不授予“如意设计 / Ruyi Design / LittleHobby”的商标使用权。
+
+本次仓库更新不修改已发布的 npm 包文件或 registry 元数据，分发范围详见[许可检查记录](docs/licensing.md)。
 
 小爱好出品 · By LittleHobby · 让设计，更合心意。

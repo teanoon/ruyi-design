@@ -12,7 +12,7 @@ Choose the version deliberately; the scripts never increment it. Use `npm versio
 npm run release:prepare -- --version 0.1.0 --tag latest
 ```
 
-Preparation checks the exact Git commit, package/lock identity, repository, public registry/access and unchanged `UNLICENSED` license. A read-only npmjs lookup rejects duplicate versions and fails on network/permission errors; only HTTP 404 means the package is absent. It runs typecheck, unit/release tests, browser/MCP workflow, conversation, gateway and discovery regressions. It then builds through `pack:local`/`prepack`, installs that exact archive in a temporary project without dev dependencies, exercises CLI/skill/MCP/browser behavior and runs:
+Preparation checks the exact Git commit, package/lock identity, repository, public registry/access and `Apache-2.0` license in both package and lock metadata. A read-only npmjs lookup rejects duplicate versions and fails on network/permission errors; only HTTP 404 means the package is absent. It runs typecheck, unit/release tests, browser/MCP workflow, conversation, gateway and discovery regressions. The packed artifact must contain the complete Apache-2.0 LICENSE and THIRD_PARTY_NOTICES.md, with matching license metadata. It then builds through `pack:local`/`prepack`, installs that exact archive in a temporary project without dev dependencies, exercises CLI/skill/MCP/browser behavior and runs:
 
 ```bash
 npm publish /absolute/path/to/dist/littlehobby-ruyi-design-0.1.0.tgz --dry-run --ignore-scripts --access public --registry=https://registry.npmjs.org/ --tag latest
@@ -40,7 +40,7 @@ Keep the manifest and archive together. Any archive change requires preparation/
 
 ## Manual first publication
 
-Before uploading, the maintainer must confirm public distribution under the current `UNLICENSED` license is intended. This workflow does not select or grant a new license. Confirm control of the `@littlehobby` scope and write permission for this package, and configure npm account 2FA. Log in interactively using `npm login --registry=https://registry.npmjs.org/`; check the account with `npm whoami --registry=https://registry.npmjs.org/`. npm handles authentication/2FA; do not commit credentials or pass secrets through release manifests.
+Before uploading, the maintainer must confirm public distribution under the current `Apache-2.0` license is intended. This workflow does not select or grant a new license. Confirm control of the `@littlehobby` scope and write permission for this package, and configure npm account 2FA. Log in interactively using `npm login --registry=https://registry.npmjs.org/`; check the account with `npm whoami --registry=https://registry.npmjs.org/`. npm handles authentication/2FA; do not commit credentials or pass secrets through release manifests.
 
 After reviewing the prepared commit, file list and digest, explicitly upload:
 

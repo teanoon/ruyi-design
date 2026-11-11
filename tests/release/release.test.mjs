@@ -8,8 +8,16 @@ import { releaseRef } from "../../scripts/release-ref.mjs";
 
 const pkg = JSON.parse(await readFile(new URL("../../package.json", import.meta.url), "utf8"));
 const lock = JSON.parse(await readFile(new URL("../../package-lock.json", import.meta.url), "utf8"));
+const license = await readFile(new URL("../../LICENSE", import.meta.url), "utf8");
+const notices = await readFile(new URL("../../THIRD_PARTY_NOTICES.md", import.meta.url), "utf8");
 const data = (versions = {}, tags = {}) => ({ name: packageName, versions, "dist-tags": tags });
 const response = (status, value) => async () => ({ status, ok: status === 200, json: async () => value });
+test("bundled workspace dependencies retain their upstream MIT notices", async () => {
+  const zod = await readFile(new URL("../../node_modules/zod/LICENSE", import.meta.url), "utf8");
+  const vite = await readFile(new URL("../../node_modules/vite/LICENSE.md", import.meta.url), "utf8");
+  assert(notices.includes(zod.trim()), "Bundled Zod must retain its complete MIT notice");
+  assert(notices.includes(vite.split("# Licenses of bundled dependencies")[0].trim()), "Vite helper must retain its complete MIT notice");
+});
 test("metadata validates identity, lock, version, tag, registry and license", () => {
   assert.equal(validateMetadata(pkg, lock), "latest");
   for (const [p, l, version, tag] of [
@@ -18,6 +26,9 @@ test("metadata validates identity, lock, version, tag, registry and license", ()
     [pkg, { ...lock, packages: { "": { ...lock.packages[""], version: "2.0.0" } } }],
     [pkg, lock, "2.0.0"], [pkg, lock, pkg.version, "next"], [pkg, lock, pkg.version, "--tag"],
     [{ ...pkg, license: "MIT" }, lock], [{ ...pkg, publishConfig: {} }, lock],
+    [{ ...pkg, license: "UNLICENSED" }, lock],
+    [pkg, { ...lock, packages: { ...lock.packages, "": { ...lock.packages[""], license: "UNLICENSED" } } }],
+    [pkg, { ...lock, packages: { ...lock.packages, "": { ...lock.packages[""], license: undefined } } }],
   ]) assert.throws(() => validateMetadata(p, l, version, tag));
   const pre = { ...pkg, version: "0.2.0-beta.1" };
   const preLock = { ...lock, version: pre.version, packages: { "": { ...lock.packages[""], version: pre.version } } };
@@ -54,6 +65,8 @@ async function fixture(runTest) {
     await writeFile(path.join(root, "package.json"), JSON.stringify(pkg));
     await writeFile(path.join(root, "package-lock.json"), JSON.stringify(lock));
     await writeFile(path.join(root, "package/package.json"), JSON.stringify(pkg));
+    await writeFile(path.join(root, "package/LICENSE"), license);
+    await writeFile(path.join(root, "package/THIRD_PARTY_NOTICES.md"), notices);
     const tarball = path.join(root, "dist/fixture.tgz");
     command("tar", ["-czf", tarball, "package"], { cwd: root, capture: true });
     const { pkg: _p, ...info } = await artifactInfo(tarball);
@@ -63,6 +76,26 @@ async function fixture(runTest) {
     await runTest({ root, tarball, manifest, manifestPath });
   } finally { await rm(root, { recursive: true, force: true }); }
 }
+test("artifact licensing rejects old metadata, missing notices and incomplete license text", async () => {
+  for (const mutate of [
+    root => writeFile(path.join(root, "package/package.json"), JSON.stringify({ ...pkg, license: "UNLICENSED" })),
+    root => writeFile(path.join(root, "package/package.json"), JSON.stringify({ ...pkg, license: "MIT" })),
+    root => rm(path.join(root, "package/LICENSE")),
+    root => writeFile(path.join(root, "package/LICENSE"), license.slice(0, -100)),
+    root => writeFile(path.join(root, "package/LICENSE"), license.replace("patent license", "different license")),
+    root => rm(path.join(root, "package/THIRD_PARTY_NOTICES.md")),
+  ]) await fixture(async ({ root, tarball, manifest }) => {
+    await mutate(root);
+    command("tar", ["-czf", tarball, "package"], { cwd: root, capture: true });
+    await assert.rejects(artifactInfo(tarball), /license|LICENSE|NOTICES/);
+    await assert.rejects(verifyArtifact(manifest, root), /license|LICENSE|NOTICES/);
+  });
+  await fixture(async ({ root, tarball }) => {
+    await writeFile(path.join(root, "package/LICENSE"), license.replace(/\n/g, "\r\n"));
+    command("tar", ["-czf", tarball, "package"], { cwd: root, capture: true });
+    assert.equal((await artifactInfo(tarball)).pkg.license, "Apache-2.0");
+  });
+});
 test("artifact changes, corruption, omitted acceptance and path traversal fail verification", () => fixture(async ({ root, tarball, manifest }) => {
   assert.equal(await verifyArtifact(manifest, root), tarball);
   for (const change of [{ sha512: "different" }, { files: [] }, { version: "2.0.0" }, { checks: {} }, { tarball: "../fixture.tgz" }, { registry: "https://other.test/" }])

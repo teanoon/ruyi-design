@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { artifactInfo } from "../../scripts/release.mjs";
 const exec = promisify(execFile),
   root = process.cwd();
 const { values, positionals } = parseArgs({ allowPositionals: true, options: { "skip-browser-checks": { type: "boolean" } } });
@@ -28,6 +29,11 @@ if (positionals[0]) {
 }
 const digest = async () => createHash("sha512").update(await readFile(tarball)).digest("hex");
 const before = await digest();
+assert.equal((await artifactInfo(tarball)).pkg.license, "Apache-2.0");
+for (const file of ["LICENSE", "THIRD_PARTY_NOTICES.md"]) {
+  const { stdout } = await exec("tar", ["-xOzf", tarball, `package/${file}`]);
+  assert.equal(stdout, await readFile(path.join(root, file), "utf8"), `${file} must be preserved in the tarball`);
+}
 assert(pack.files.every(file => !file.path.endsWith(".tgz")), "Release archives must not be nested in the npm package");
 assert(pack.files.every(file => !/^dist\/release-.*\.json$/.test(file.path)), "Release manifests must not enter the package");
 for (const file of pack.files)
@@ -38,6 +44,8 @@ for (const file of pack.files)
     file.path,
   );
 for (const expected of [
+  "LICENSE",
+  "THIRD_PARTY_NOTICES.md",
   "dist/cli/index.js",
   "dist/workspace/index.html",
   "dist/bridge/bridge.js",
@@ -83,6 +91,9 @@ try {
     await readFile(path.join(installed, "package.json"), "utf8"),
   );
   assert.equal(pkg.name, "@littlehobby/ruyi-design");
+  assert.equal(pkg.license, "Apache-2.0");
+  for (const file of ["LICENSE", "THIRD_PARTY_NOTICES.md"])
+    assert.equal(await readFile(path.join(installed, file), "utf8"), await readFile(path.join(root, file), "utf8"), `${file} must be preserved after installation`);
   assert(!pkg.scripts.postinstall);
   const binary = path.join(temp, "node_modules/.bin/ruyi-design");
   assert((await exec(binary, ["--help"], { cwd: temp })).stdout.includes("ruyi-design mcp"));

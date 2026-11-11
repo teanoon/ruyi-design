@@ -8,6 +8,12 @@ import { setTimeout as delay } from "node:timers/promises";
 
 export const registry = "https://registry.npmjs.org/";
 export const packageName = "@littlehobby/ruyi-design";
+// SHA-256 of the complete official https://www.apache.org/licenses/LICENSE-2.0
+// text, with CRLF normalized and outer whitespace trimmed.
+export function validateLicenseText(text) {
+  if (createHash("sha256").update(text.replace(/\r\n/g, "\n").trim()).digest("hex") !== "283ea6cc2997a1a70da0049e09adf9317bb60ca1b51279b65196b83a69e1996b")
+    throw new Error("Artifact must contain the complete Apache-2.0 LICENSE");
+}
 const coreChecks = ["typecheck", "unit", "release", "install", "dryRun"];
 const browserChecks = ["browser", "conversation", "gateway", "discovery"];
 export function command(file, args, { cwd = process.cwd(), capture = false } = {}) {
@@ -22,8 +28,10 @@ export function validateMetadata(pkg, lock, version = pkg.version, tag = pkg.ver
     throw new Error("Expected version must match the package semantic version");
   if (!/^[a-z][a-z0-9._-]*$/.test(tag) || (pkg.version.includes("-") ? tag === "latest" : tag !== "latest"))
     throw new Error("Stable versions require latest; prereleases require a non-latest dist-tag");
-  if (pkg.private || pkg.license !== "UNLICENSED" || pkg.publishConfig?.registry !== registry || pkg.publishConfig?.access !== "public" || pkg.repository?.url !== "git+https://github.com/teanoon/ruyi-design.git")
-    throw new Error("Release metadata must retain UNLICENSED, public npmjs access and the project repository");
+  if (pkg.license !== "Apache-2.0" || lock.packages?.[""]?.license !== "Apache-2.0")
+    throw new Error("Package and lock root license must both be Apache-2.0");
+  if (pkg.private || pkg.publishConfig?.registry !== registry || pkg.publishConfig?.access !== "public" || pkg.repository?.url !== "git+https://github.com/teanoon/ruyi-design.git")
+    throw new Error("Release metadata must retain public npmjs access and the project repository");
   return tag;
 }
 export async function registryPackage(fetcher = fetch) {
@@ -55,6 +63,10 @@ export async function artifactInfo(tarball, run = command) {
       throw new Error(`Unexpected package file: ${file}`);
   }
   const pkg = JSON.parse(run("tar", ["-xOzf", tarball, "package/package.json"], { capture: true }));
+  if (pkg.license !== "Apache-2.0") throw new Error("Artifact license must be Apache-2.0");
+  if (!files.includes("package/LICENSE")) throw new Error("Artifact is missing LICENSE");
+  validateLicenseText(run("tar", ["-xOzf", tarball, "package/LICENSE"], { capture: true }));
+  if (!files.includes("package/THIRD_PARTY_NOTICES.md")) throw new Error("Artifact is missing THIRD_PARTY_NOTICES.md");
   return { name: pkg.name, version: pkg.version, sha512: sha512.toString("hex"), integrity: `sha512-${sha512.toString("base64")}`, files: files.map(f => f.slice(8)).sort(), pkg };
 }
 export async function verifyArtifact(manifest, root, run = command) {

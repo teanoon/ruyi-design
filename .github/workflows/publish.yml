@@ -17,7 +17,7 @@ on:
         default: latest
         type: string
       confirm_license_and_scope:
-        description: I approve public distribution under UNLICENSED and have scope permission
+        description: I approve public distribution under Apache-2.0 and have scope permission
         required: true
         default: false
         type: boolean
