@@ -245,6 +245,13 @@ if (config && window.parent !== window) {
   document.addEventListener(
     "pointerdown",
     (e) => {
+      // A select/input takes native focus on pointerdown, before our click
+      // selection message reaches the comment composer. Suppress that default
+      // in element mode as well as prototype pointer handlers.
+      if (mode === "element") {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      }
       if (mode === "region") {
         start = { x: e.clientX, y: e.clientY };
         e.preventDefault();

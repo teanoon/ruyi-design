@@ -1,3 +1,5 @@
+import {mountPageNavigation} from '../components/page-navigation.js';
+import {samplePages,sampleNavigation} from '../components/ui.js';
 import {routedMarkup} from '../components/ui.js';
 import {componentExample} from '../components/examples.js';
 const params=new URLSearchParams(location.search),component=params.get('component')||'button',state=params.get('state')||'default';
@@ -6,3 +8,5 @@ const title=names[component]||'组件';
 document.getElementById('app').innerHTML=routedMarkup(`<main class="showcase"><div class="eyebrow">RUYI DESIGN / 组件</div><h1>${title}</h1><p>共享实现 · ${state} · 由页面直接复用</p><section class="showcase-stage" data-review-id="component-${component}-${state}">${componentExample(component,state)}</section></main>`);
 
 window.ruyiDesignReviewState={exportState:()=>({}),restoreState:()=>{}};
+
+for(const host of document.querySelectorAll('[data-prototype-page-navigation]')) {let selected=state==='selected'?'story':'home';let nav;const options=()=>({projectId:'ruyi-navigation-showcase',pages:samplePages,nodes:sampleNavigation,activePage:selected,onSelect:id=>{selected=id;nav.update(options())}});nav=mountPageNavigation(host,options());}

@@ -239,6 +239,16 @@ export class Feedback {
       const c = this.comment(id);
       if (message.trim())
         c.thread.push({ author: "user", text: message, at: Date.now() });
+      if (action === "reply" && message.trim()) {
+        const active = this.store.all<Batch>("batch").some(b =>
+          (b.status === "queued" || b.status === "processing") && b.items.some(item => item.id === id));
+        // Replies remain separate from fixed batch inputs. Outside a running
+        // batch, a user's follow-up is immediately available for the next round.
+        if (!active && c.status !== "draft") {
+          c.previousDraft = { text: c.text, status: c.status };
+          c.status = "draft";
+        }
+      }
       if (action === "resolve") {
         ensure(
           c.status === "awaiting_review",
@@ -302,8 +312,12 @@ export class Feedback {
       const result = c.results.find((r) => r.batchId === batchId);
       if (result) {
         result.revisionId = revisionId;
-        c.status =
-          result.action === "unaddressed" ? "submitted" : "awaiting_review";
+        const status = result.action === "unaddressed" ? "submitted" : "awaiting_review";
+        const followUp = c.thread.slice(item.thread.length).some(t => t.author === "user");
+        if (followUp) {
+          c.previousDraft = { text: c.text, status };
+          c.status = "draft";
+        } else c.status = status;
         this.store.put("comment", c);
       }
     }

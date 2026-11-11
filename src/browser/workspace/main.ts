@@ -1,6 +1,9 @@
+import { mountPageNavigation } from '../../../design/components/page-navigation.js';
+import '../../../design/components/page-navigation.css';
 import { adjacent, bindShortcuts, isShortcutAction, type ShortcutAction } from "../../contracts/shortcuts.js";
 import { BRAND } from "../../contracts/brand.js";
 import "../styles/workspace.css";
+import "../../../design/components/connection-status.css";
 import { isBridgeMessage, type BridgeMessage } from "../../contracts/bridge.js";
 import { routedUrl } from "../../contracts/urls.js";
 import {
@@ -116,7 +119,7 @@ function message(frame: Frame, type: BridgeMessage["type"], payload?: any) {
     context.previewSandboxed ? "*" : new URL(context.previewBase).origin,
   );
 }
-function choose(next: View) {
+function choose(next: View, reveal = false) {
   clearTimeout(locateTimer);
   const m = displayedRevision().manifest as Manifest;
   if (next.kind === "component") {
@@ -134,31 +137,35 @@ function choose(next: View) {
   if (gatewayPort) q.set("port", gatewayPort);
   if (historicalRevision) q.set("revision", historicalRevision.id);
   history.pushState(null, "", `?${q}`);
-  renderNav();
+  renderNav(reveal);
   renderCanvas();
 }
-function renderNav() {
+let pageNavigation: ReturnType<typeof mountPageNavigation>;
+const pageNavigationHost = document.createElement("div");
+function renderNav(reveal = false) {
   const m = displayedRevision().manifest as Manifest;
   const nav = el("navigation");
+  const navFocus = document.activeElement instanceof HTMLElement ? document.activeElement.dataset.navFocus : undefined;
   nav.replaceChildren();
   const label = (text: string) => {
     const p = document.createElement("div");
     p.className = "nav-section";
     p.textContent = text;
-    if (text === "页面") { const count = document.createElement("span"); count.textContent = String(m.pages.length).padStart(2, "0"); p.append(count); }
     nav.append(p);
   };
-  label("页面");
-  for (const page of m.pages) {
-    const active = view.kind === "page" && view.id === page.id;
-    const b = button(page.name, () => {
-      const state = page.states.find((s) => s.entries[view.device]) ?? page.states[0];
-      choose({ kind: "page", id: page.id, state: state.id,
-        device: state.entries[view.device] ? view.device : Object.keys(state.entries)[0] });
-    }, active ? "nav-item active" : "nav-item");
-    if (active) b.setAttribute("aria-current", "page");
-    nav.append(b);
-  }
+  nav.append(pageNavigationHost);
+  const navigationOptions = {
+    projectId: m.id, pages: m.pages, nodes: m.pageNavigation,
+    activePage: view.kind === "page" ? view.id : undefined,
+    onSelect: (id: string) => {
+      const page = m.pages.find(p => p.id === id)!;
+      const state = page.states.find(s => s.entries[view.device]) ?? page.states[0];
+      choose({kind: "page", id, state: state.id,
+        device: state.entries[view.device] ? view.device : Object.keys(state.entries)[0]});
+    },
+  };
+  if (pageNavigation) pageNavigation.update(navigationOptions, reveal);
+  else pageNavigation = mountPageNavigation(pageNavigationHost, navigationOptions);
   label("设计系统");
   nav.append(
     button(
@@ -177,7 +184,7 @@ function renderNav() {
           : "nav-item",
       ),
     );
-  for (const item of nav.querySelectorAll("button")) {
+  for (const item of nav.querySelectorAll(":scope > button")) {
     if (item.classList.contains("active")) item.setAttribute("aria-current", "page");
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.classList.add("nav-icon"); svg.setAttribute("viewBox", "0 0 24 24"); svg.setAttribute("fill", "none"); svg.setAttribute("stroke", "currentColor"); svg.setAttribute("stroke-width", "1.6"); svg.setAttribute("aria-hidden", "true");
@@ -185,6 +192,9 @@ function renderNav() {
     path.setAttribute("d", item.textContent === "设计令牌" ? "M12 5v14M5 12h14" : "M5 3h10l4 4v14H5ZM14 3v5h5M8 12h8M8 16h6");
     svg.append(path); item.prepend(svg);
   }
+  if (navFocus) [...pageNavigationHost.querySelectorAll<HTMLElement>("[data-nav-focus]")]
+    .find(n => n.dataset.navFocus === navFocus && !n.closest("[hidden]"))?.focus({preventScroll: true});
+
 }
 function frameCard(entry: any, target: Target, name: string, restore?: any) {
   const device = (displayedRevision().manifest as Manifest).devices.find(
@@ -409,7 +419,7 @@ async function locateComment(comment: any, original = false) {
   // Reopen the declared entry even if an existing frame navigated elsewhere
   // during preview. Keep the comment's original revision and target immutable.
   choose({ kind: combo.kind, id: combo.objectId, device: combo.deviceId,
-    state: combo.kind === "page" ? combo.stateId : undefined });
+    state: combo.kind === "page" ? combo.stateId : undefined }, true);
   const f = [...frames.values()].find((f) =>
     f.target.kind === target.kind && f.target.objectId === target.objectId &&
     f.target.deviceId === target.deviceId && f.target.stateId === target.stateId &&
@@ -508,14 +518,12 @@ function renderComments() {
       actions.append(
         button("确认解决", async () => {
           await api(`comments/${c.id}/review`, { action: "resolve" });
-          archiveSelected = true;
           await refresh();
         }),
       );
     if (c.status !== "resolved") {
       const archiveButton = button("归档", async () => {
         await api(`comments/${c.id}/review`, { action: "archive" });
-        archiveSelected = true;
         if (editing?.replace(/^reply:/, "") === c.id) {
           el("composer").hidden = true;
           editing = undefined;
@@ -538,6 +546,7 @@ function renderComments() {
         }),
       );
     actions.append(
+      button("新增评论", () => compose(c.target)),
       button("回复", () => {
         compose(c.target);
         editing = `reply:${c.id}`;
@@ -606,7 +615,7 @@ window.addEventListener("message", (e) => {
     const existing = [...context.comments].reverse().find((c: any) => {
       const t = c.target, a = t.context?.anchor;
       if (c.status === "resolved" || t.kind !== target.kind || t.objectId !== target.objectId || t.stateId !== target.stateId || t.deviceId !== target.deviceId || t.exampleId !== target.exampleId || !anchor?.selector || !a?.selector) return false;
-      return a.selector === anchor.selector || (a.reviewId && a.reviewId === anchor.reviewId) || anchor.ancestors?.some((p: any) => p.selector === a.selector) || a.ancestors?.some((p: any) => p.selector === anchor.selector);
+      return a.reviewId && anchor.reviewId ? a.reviewId === anchor.reviewId : a.selector === anchor.selector;
     });
     if (existing?.status === "draft") compose(existing.target, existing);
     else if (existing) {
@@ -669,11 +678,11 @@ async function updateRevision() {
   if (old === context.revision.id) return;
   const next = latestAvailableView();
   if (next !== view) {
-    choose(next);
+    choose(next, true);
     notice("原设计入口已移除，已切换到最新可用页面；原版本仍可查看。");
     return;
   }
-  renderNav();
+  renderNav(true);
   if (context.revision.mode === "styles" && !context.previewSandboxed) {
     for (const f of frames.values()) {
       f.target.revisionId = context.revision.id;
@@ -681,6 +690,12 @@ async function updateRevision() {
     }
   } else renderCanvas(restores);
   notice("已自动更新到最新版本，等待你复核。");
+}
+function connectionStatus(text: string, state: "connected" | "reconnecting" | "error") {
+  const status = el("activity");
+  status.dataset.state = state;
+  status.title = state === "reconnecting" ? "服务连接中断，正在自动重连" : state === "error" ? "工作区连接失败，请检查评审服务" : "本机工作区已连接";
+  status.querySelector(".connection-state-label")!.textContent = text;
 }
 async function events() {
   while (connected) {
@@ -703,11 +718,7 @@ async function events() {
           if (!line) continue;
           const result = JSON.parse(line.slice(6));
           cursor = result.nextCursor;
-          el("activity").textContent =
-            {
-              working: "已连接 · AI 修改中",
-              idle: "已连接",
-            }[result.activity as string] ?? "已连接";
+          connectionStatus(result.activity === "working" ? "AI 修改中" : "已连接", "connected");
           if (
             result.resyncRequired ||
             result.events.some((e: any) => e.type === "revision.published")
@@ -717,7 +728,7 @@ async function events() {
         }
       }
     } catch {
-      el("activity").textContent = "服务连接中断，正在重连";
+      connectionStatus("正在重连", "reconnecting");
       await new Promise((r) => setTimeout(r, 2000));
     }
   }
@@ -784,6 +795,7 @@ el("cancel-comment").onclick = () => {
   composerBeforePreview = false;
   selection = undefined;
   editing = undefined;
+  renderComments();
 };
 el("comment-text").addEventListener("keydown", (e: KeyboardEvent) => {
   if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !e.isComposing) {
@@ -795,11 +807,17 @@ el("composer").onsubmit = async (e) => {
   e.preventDefault();
   try {
     const text = el<HTMLTextAreaElement>("comment-text").value;
-    if (editing?.startsWith("reply:"))
-      await api(`comments/${editing.slice(6)}/review`, {
-        action: "reply",
-        message: text,
-      });
+    if (editing?.startsWith("reply:")) {
+      const id = editing.slice(6);
+      const replied = await api(`comments/${id}/review`, { action: "reply", message: text });
+      // A running MCP process may still use the previous server module after
+      // a local build. Keep reply reopening available until its next restart.
+      const active = context.batches.some((b: any) =>
+        ["queued", "processing"].includes(b.status) && b.items.some((item: any) => item.id === id));
+      if (replied.status !== "draft" && !active)
+        await api(`comments/${id}/review`, { action: "reopen" });
+      if (replied.status === "draft" || !active) archiveSelected = false;
+    }
     else if (editing) await api(`comments/${editing}`, { text }, "PATCH");
     else if (selection) await api("comments", { text, target: selection });
     el("composer").hidden = true;
@@ -813,7 +831,7 @@ el("composer").onsubmit = async (e) => {
 };
 el("return-latest").onclick = () => {
   historicalRevision = undefined;
-  choose(latestAvailableView());
+  choose(latestAvailableView(), true);
   notice("已返回最新版本。");
 };
 window.onpopstate = async () => {
@@ -835,7 +853,7 @@ window.onpopstate = async () => {
     device: p.get("device") ?? "",
     state: p.get("state") ?? undefined,
   };
-  renderNav();
+  renderNav(true);
   renderCanvas();
 };
 async function init() {
@@ -858,13 +876,12 @@ async function init() {
     else view = { kind: "tokens", id: "tokens", device: m.devices[0].id };
   }
   if (!view.device) view.device = m.devices[0].id;
-  renderNav();
+  renderNav(true);
   renderCanvas();
   connected = true;
   void events();
 }
 void init().catch((e) => {
-  el("activity").textContent = "工作区连接失败";
-  el("activity").dataset.tone = "error";
+  connectionStatus("连接失败", "error");
   notice(e.message, "error");
 });

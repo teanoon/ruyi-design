@@ -14,6 +14,21 @@ try{
  const rev=server.session.active();
  const url=(state='default')=>`${server.internalPreviewBase}/r/${rev.id}/pages/workbench.html?state=${state}`;
  assert.deepEqual(rev.manifest.pages.map(p=>p.id),['workbench']);
+ await page.goto(url(),{waitUntil:'networkidle'});
+ assert(await page.evaluate(async()=>{
+  const {mountPageNavigation}=await import(new URL('../components/page-navigation.js',location.href).href);
+  const host=document.createElement('div');document.body.append(host);
+  const keys=['ruyi-design:page-navigation:isolation-a','ruyi-design:page-navigation:isolation-b'];keys.forEach(k=>localStorage.removeItem(k));
+  const opts=projectId=>({projectId,pages:[{id:'one',name:'One'}],nodes:[{id:'shared-group',name:'Group',children:[{id:'one-nav',pageId:'one'}]}],onSelect:()=>{}});
+  const controller=mountPageNavigation(host,opts('isolation-a'));
+  const toggle=()=>host.querySelector('[data-nav-focus="toggle:shared-group"]');
+  toggle().click();const expandedA=toggle().getAttribute('aria-expanded');
+  controller.update(opts('isolation-b'));const collapsedB=toggle().getAttribute('aria-expanded');
+  controller.update(opts('isolation-a'));const restoredA=toggle().getAttribute('aria-expanded');
+  host.remove();keys.forEach(k=>localStorage.removeItem(k));
+  return expandedA==='true'&&collapsedB==='false'&&restoredA==='true';
+ }),'Projects isolate expansion preferences even when node IDs match');
+
  await mkdir('test-results/product-design',{recursive:true});
  for(const combo of combinations(rev.manifest)){
   const device=rev.manifest.devices.find(d=>d.id===combo.deviceId);await page.setViewportSize({width:device.width,height:device.height});
@@ -21,9 +36,29 @@ try{
   await page.goto(entry.href,{waitUntil:'networkidle'});assert.deepEqual(errors,[]);
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`Overflow: ${combo.objectId}/${combo.stateId||combo.exampleId}/${combo.deviceId}`);
   assert(await page.locator('h1').count(),`Empty entry ${entry}`);
+  assert(await page.evaluate(()=>[...document.querySelectorAll('[data-page-navigation] [aria-controls]')].every(node=>document.querySelectorAll(`[id="${node.getAttribute('aria-controls')}"]`).length===1)),'Each navigation disclosure controls one unique list');
  }
  for(const [width,id] of [[1280,'desktop'],[390,'mobile']]){
   await page.setViewportSize({width,height:900});await page.goto(url(),{waitUntil:'networkidle'});
+  const tree=page.locator('.sidebar [data-page-navigation]');
+  const homeToggle=()=>tree.locator('[data-nav-focus="toggle:home-nav"]');
+  const search=()=>tree.getByRole('searchbox',{name:'搜索页面'});
+  // Parent page and disclosure are separate; changing directory never rebuilds the canvas.
+  if(await homeToggle().getAttribute('aria-expanded')==='true')await homeToggle().click();
+  const canvasHandle=await page.locator('[data-review-id="design-canvas"]').elementHandle();
+  const parentUrl=page.url();await homeToggle().click();
+  assert.equal(await canvasHandle.evaluate(n=>n.isConnected),true);assert.equal(page.url(),parentUrl);
+  await tree.getByRole('button',{name:'首页',exact:true}).click();
+  assert.equal(await homeToggle().getAttribute('aria-expanded'),'true');
+  await tree.getByRole('button',{name:'品牌故事',exact:true}).click();
+  await homeToggle().click();assert.equal((await page.evaluate(()=>window.ruyiDesignReviewState.exportState())).selectedPage,'story');
+  await search().fill('品牌故事');assert.equal(await tree.locator('[data-page-id="story"]').isVisible(),true);
+  await search().fill('');assert.equal(await homeToggle().getAttribute('aria-expanded'),'false');
+  await homeToggle().focus();const navState=await page.evaluate(()=>window.ruyiDesignReviewState.exportState());
+  await page.keyboard.press('ArrowRight');assert.deepEqual(await page.evaluate(()=>window.ruyiDesignReviewState.exportState()),navState);
+  await page.keyboard.press('Space');assert.equal(await homeToggle().getAttribute('aria-expanded'),'true');
+  await tree.getByRole('button',{name:'首页',exact:true}).click();
+  await page.screenshot({path:`test-results/product-design/navigation-${id}.png`,fullPage:true});
   assert.equal(await page.locator('.sidebar-bottom,.next-step,.avatar').count(),0);
   assert.equal(await page.getByRole('link',{name:'全部评论',exact:true}).count(),0);
   const nav=await page.locator('.sidebar').boundingBox(),brand=await page.locator('.workspace-brand').boundingBox();
@@ -33,8 +68,8 @@ try{
   const connection=await page.locator('.sidebar-footer .connection-status').boundingBox();
   assert.equal(await page.locator('.sidebar-footer .badge').count(),0);
   assert.equal(await page.locator('[data-review-id="preview-toggle"] .preview-version').textContent(),'03');
-  assert(Math.abs(connection.x-brand.x)<2,'Connection and brand have the same left edge');
-  assert(Math.abs(connection.x+connection.width-brand.x-brand.width)<2,'Footer rows have the same right edge');
+  assert(connection.x>brand.x,'Connection capsule is in the brand text column');
+  assert(connection.x+connection.width<=brand.x+brand.width+1,'Capsule stays within brand width');assert.equal(await page.locator('.workspace-brand-en').count(),0);
   assert(connection.x>=nav.x && connection.x+connection.width<=nav.x+nav.width);
   const mark=await page.locator('.workspace-brand img').boundingBox(),name=await page.locator('.workspace-brand-name').boundingBox();
   assert(name.x>mark.x+mark.width);assert(name.y<mark.y+mark.height);
@@ -57,7 +92,7 @@ try{
   assert((await page.locator('.comment-card').first().textContent()).includes('新评论应排在最上方'));
   await page.screenshot({path:`test-results/product-design/workbench-${id}.png`,fullPage:true});
   await page.goto(url('updated'));await page.getByRole('button',{name:'确认解决',exact:true}).first().click();await page.getByRole('button',{name:'已归档 2',exact:true}).waitFor();
-  await page.getByRole('button',{name:'重新打开',exact:true}).first().click();
+  assert.equal((await page.evaluate(()=>window.ruyiDesignReviewState.exportState())).tab,'active');await page.getByRole('button',{name:'已归档 2',exact:true}).click();await page.getByRole('button',{name:'重新打开',exact:true}).first().click();
   await page.getByRole('button',{name:'查看原版本',exact:true}).first().click();await page.getByRole('button',{name:'返回最新版本',exact:true}).waitFor();
   await page.getByRole('button',{name:'返回最新版本',exact:true}).click();
   await page.goto(`${server.internalPreviewBase}/r/${rev.id}/showcases/index.html?component=brand&state=default`);
@@ -68,6 +103,18 @@ try{
   assert.equal(await page.locator('img').count(),5);
 
  }
+ // Multiple comments on the same prototype element and cancellation preserve saved text.
+ await page.goto(url(),{waitUntil:'networkidle'});
+ const originalCard=page.locator('[data-review-id="comment-headline"]');
+ const originalText=await originalCard.locator('p').first().textContent();
+ await originalCard.getByRole('button',{name:'编辑',exact:true}).click();
+ await page.getByLabel('编辑评论',{exact:true}).fill('未保存的内容');
+ await page.getByRole('button',{name:'取消',exact:true}).click();
+ assert.equal(await originalCard.locator('p').first().textContent(),originalText);
+ await originalCard.getByRole('button',{name:'新增评论',exact:true}).click();
+ await page.getByLabel('添加元素评论',{exact:true}).fill('同一标题的第二条评论');
+ await page.getByLabel('添加元素评论',{exact:true}).press('Control+Enter');
+ assert.equal((await page.evaluate(()=>window.ruyiDesignReviewState.exportState())).comments.filter(c=>c.target==='headline').length,2);
  // Review-gated shortcut prototype: exercise the inner design, not the runtime shell.
  await page.setViewportSize({width:1280,height:900});await page.goto(url(),{waitUntil:'networkidle'});
  const snapshot=()=>page.evaluate(()=>window.ruyiDesignReviewState.exportState());
@@ -78,10 +125,10 @@ try{
  await press('ArrowRight');assert.equal((await snapshot()).device,'mobile');
  await press('ArrowDown');assert.equal((await snapshot()).sampleState,'empty');assert.equal((await snapshot()).device,'desktop');
  assert.equal(await page.locator('#scene').inputValue(),'empty');assert.equal(await page.locator('#device option').count(),1);
- await press('ArrowDown');assert.equal((await snapshot()).sampleState,'empty');await press('ArrowLeft');assert.equal((await snapshot()).device,'desktop');
- assert.equal(new URL(page.url()).searchParams.get('sampleState'),'empty');await page.reload();await page.waitForFunction(()=>!!window.ruyiDesignReviewState);assert.equal((await snapshot()).sampleState,'empty');
+ await press('ArrowDown');assert.equal((await snapshot()).sampleState,'navigation-expanded');assert.equal(await page.locator('.sidebar [data-nav-focus="toggle:home-nav"]').getAttribute('aria-expanded'),'true');await press('ArrowLeft');assert.equal((await snapshot()).device,'desktop');
+ assert.equal(new URL(page.url()).searchParams.get('sampleState'),'navigation-expanded');await page.reload();await page.waitForFunction(()=>!!window.ruyiDesignReviewState);assert.equal((await snapshot()).sampleState,'navigation-expanded');
  await page.locator('#scene').selectOption('default');await page.locator('#device').selectOption('mobile');
- await page.getByRole('button',{name:'品牌故事',exact:true}).click();await press('ArrowLeft');assert.equal((await snapshot()).device,'desktop');
+ if(!await page.getByRole('button',{name:'品牌故事',exact:true}).isVisible())await page.getByRole('button',{name:'展开首页',exact:true}).click();await page.getByRole('button',{name:'品牌故事',exact:true}).click();await press('ArrowLeft');assert.equal((await snapshot()).device,'desktop');
  await press('ArrowDown');assert.equal((await snapshot()).sampleState,'reading');assert.equal((await snapshot()).device,'mobile');
  await page.getByRole('button',{name:'首页',exact:true}).click();await page.locator('#device').selectOption('desktop');
  // Editing survives mode and combination changes, keeping the original comment context.
@@ -93,7 +140,7 @@ try{
  await page.getByLabel('编辑评论',{exact:true}).press('Control+Enter');assert.equal((await snapshot()).comments.filter(c=>c.id==='headline').length,1);
  await page.locator('[data-review-id="comment-headline"]').getByText(draft,{exact:true}).waitFor();
  // Native focus, composition, repeated keys and modifier chords are not workspace actions.
- await page.getByRole('button',{name:'联系与到访',exact:true}).click();
+ await page.getByRole('button',{name:'展开到访管理',exact:true}).click();await page.getByRole('button',{name:'联系与到访',exact:true}).click();
  await page.locator('input[name="visitor"]').fill('c');await page.locator('input[name="visitor"]').press('c');assert.equal((await snapshot()).preview,false);
  for(const target of ['input[name="visitor"]','select[name="visit"]','#device','#scene']){
   const before=await snapshot();const result=await page.locator(target).evaluate(node=>node.dispatchEvent(new KeyboardEvent('keydown',{key:'c',bubbles:true,cancelable:true})));
@@ -116,7 +163,7 @@ try{
  await page.getByRole('button',{name:'设计令牌',exact:true}).click();assert.equal(await page.locator('.prototype-tokens article').count(),13);assert(await page.locator('#device').isDisabled());const tokens=await snapshot();await press('ArrowLeft');await press('ArrowUp');assert.deepEqual(await snapshot(),tokens);
  await page.getByRole('button',{name:'首页',exact:true}).click();await page.getByRole('button',{name:'查看原版本',exact:true}).first().click();await press('c');assert.equal((await snapshot()).preview,false);assert(await page.locator('[data-review-id="preview-toggle"]').isDisabled());await page.getByRole('button',{name:'返回最新版本',exact:true}).click();
  await page.locator('[data-review-id="comment-headline"]').getByRole('button',{name:'归档',exact:true}).click();assert.equal((await snapshot()).comments.find(c=>c.id==='headline').resolution,'archived');
- await page.locator('[data-review-id="comment-headline"]').getByRole('button',{name:'重新打开',exact:true}).click();await page.locator('[data-review-id="comment-headline"]').getByRole('button',{name:'归档',exact:true}).click();assert.equal((await snapshot()).comments.find(c=>c.id==='headline').resolution,'archived');
+ await page.getByRole('button',{name:/已归档/}).click();await page.locator('[data-review-id="comment-headline"]').getByRole('button',{name:'重新打开',exact:true}).click();await page.locator('[data-review-id="comment-headline"]').getByRole('button',{name:'归档',exact:true}).click();assert.equal((await snapshot()).comments.find(c=>c.id==='headline').resolution,'archived');
  await page.getByRole('button',{name:/进行中/}).click();await page.getByRole('button',{name:'首页',exact:true}).click();
  for(const [width,device]of [[1280,'desktop'],[390,'mobile']]){
   await page.setViewportSize({width,height:900});await page.goto(url(),{waitUntil:'networkidle'});assert.equal(await page.locator('.keyboard-help').count(),0);

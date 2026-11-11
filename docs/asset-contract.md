@@ -16,6 +16,23 @@ Required manifest properties: `schemaVersion: 1`, `id`, `name`, and a nonempty `
 
 Pages have `id`, `name`, optional `components` IDs, and `states`. Each state has `id`, `name` and `entries`, a device-ID map. Each entry contains `path` and optional `query` object and `hash`. Use relative HTML paths inside the design directory. Paths cannot contain traversal, hidden path segments, percent encoding, query strings or absolute URLs; encode initialization through the separate query/hash fields. The same file may initialize multiple states. Do not rely on earlier clicks or retained browser state for initial scenes.
 
+Optional `pageNavigation` defines ordered recursive navigation nodes independently of the flat `pages` array. A node has a stable `id`, optional `pageId`, optional nonempty `name`, and optional `children`. A page node defaults its display name to the referenced page name; a pure group requires a name and nonempty children. Node IDs are unique across the whole tree; page references must exist and each page can be referenced at most once. Every node must reference a page or contain children. IDs and page/state/device identity do not depend on directory position.
+
+```json
+"pageNavigation": [
+  {"id": "home-nav", "pageId": "home", "children": [
+    {"id": "project-nav", "pageId": "project"}
+  ]},
+  {"id": "account-nav", "name": "Account", "children": [
+    {"id": "settings-nav", "pageId": "settings"}
+  ]}
+]
+```
+
+A parent page name opens its own entry; its separate arrow expands/collapses children. No extra overview page is required. A pure group only expands/collapses. Missing or empty navigation keeps the original flat page order. Unreferenced pages are appended at root in page order. Prefer two or three levels; states and devices remain in content controls. Total count includes parent pages, while each branch count includes descendant pages only.
+
+Search preserves matching pages and ancestor paths; clearing it restores expansion preferences. Link/comment/version navigation clears search and reveals the target in the displayed revision's tree. Expansion preferences are local to the browser and keyed by project `id` and node ID; give distinct projects distinct manifest IDs. Storage restrictions do not prevent navigation. Existing manifests need no migration; hierarchical display requires an updated workspace, and older clients may ignore the optional field. Removing the field restores flat navigation without rewriting comments or historical snapshots.
+
 Components have `id`, `name`, `implementation` paths and `examples`; examples have `id`, `name`, and the same `entries` mapping. All applicable examples for the selected device appear in one component page. Unsupported combinations such as mobile hover can simply be omitted. Component parameters such as size or primary/secondary appearance are example metadata, not additional navigation levels.
 
 Tokens have `id`, `name`, `group`, `type`, `value`, `description` and optionally `cssVariable`. Types are color, typography, spacing, radius, shadow or other. Keep group members adjacent for presentation. Keep actual CSS custom property values synchronized with the token catalog. The tool shows declared values; it does not infer the complete token graph from CSS.

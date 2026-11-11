@@ -100,6 +100,24 @@
               }
             }
           }
+        },
+        {
+          "id": "navigation-expanded",
+          "name": "首页下级页面展开",
+          "entries": {
+            "desktop": {
+              "path": "pages/workbench.html",
+              "query": {
+                "state": "navigation-expanded"
+              }
+            },
+            "mobile": {
+              "path": "pages/workbench.html",
+              "query": {
+                "state": "navigation-expanded"
+              }
+            }
+          }
         }
       ]
     }

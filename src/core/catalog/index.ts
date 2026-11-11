@@ -47,6 +47,24 @@ export function validateReferences(m: Manifest) {
     m.tokens.map((t) => t.id),
     "tokens",
   );
+  const navigationIds = new Set<string>();
+  const referencedPages = new Set<string>();
+  const pages = new Set(m.pages.map(p => p.id));
+  function validateNodes(nodes: NonNullable<Manifest["pageNavigation"]>, at: string) {
+    nodes.forEach((node, index) => {
+      const location = `${at}[${index}]`;
+      ensure(!navigationIds.has(node.id), "duplicate_id", `${location}.id: Duplicate navigation ID ${node.id}`);
+      navigationIds.add(node.id);
+      ensure(node.pageId || node.children?.length, "invalid_navigation", `${location}: Expected a page reference or nonempty children`);
+      if (node.pageId) {
+        ensure(pages.has(node.pageId), "missing_reference", `${location}.pageId: Unknown page ${node.pageId}`);
+        ensure(!referencedPages.has(node.pageId), "duplicate_reference", `${location}.pageId: Duplicate page reference ${node.pageId}`);
+        referencedPages.add(node.pageId);
+      } else ensure(node.name?.trim(), "invalid_navigation", `${location}.name: A group requires a name`);
+      validateNodes(node.children ?? [], `${location}.children`);
+    });
+  }
+  validateNodes(m.pageNavigation ?? [], "pageNavigation");
   for (const p of m.pages) {
     unique(
       p.states.map((s) => s.id),

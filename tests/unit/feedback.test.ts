@@ -27,6 +27,40 @@ const target = {
   revisionId: "v1",
 };
 describe("durable review workflow", () => {
+  it("reopens follow-up replies while retaining text, targets and published history", () =>
+    fixture((store, f) => {
+      const c = f.add("Original", target), batch = f.prepare("first"), lease = f.claim(batch.id, "test", "claim");
+      f.update(batch.id, lease.leaseToken!, "modified", c.id, "Fixed", "component");
+      store.transaction(() => f.published(batch.id, "v2"));
+      const before = structuredClone(f.comment(c.id));
+      const replied = f.review(c.id, "reply", "Please refine this further");
+      expect(replied.status).toBe("draft");
+      expect(replied.text).toBe(before.text); expect(replied.target).toEqual(before.target); expect(replied.results).toEqual(before.results);
+      expect(f.prepare("second").items[0].thread.at(-1)?.text).toBe("Please refine this further");
+    }));
+  it("reopens replies to archived comments without discarding their history", () =>
+    fixture((_store, f) => {
+      const c = f.add("Original", target); f.review(c.id, "archive");
+      expect(f.review(c.id, "reply", "More feedback").status).toBe("draft");
+      expect(f.comment(c.id).previousDraft?.status).toBe("resolved");
+      expect(f.comment(c.id).thread.at(-1)?.text).toBe("More feedback");
+    }));
+  it("keeps queued/processing inputs fixed and queues later replies after publication", () =>
+    fixture((store, f) => {
+      const c = f.add("Original", target), batch = f.prepare("fixed");
+      f.review(c.id, "reply", "Reply after queueing");
+      expect(f.comment(c.id).status).toBe("submitted");
+      const lease = f.claim(batch.id, "test", "claim");
+      f.review(c.id, "reply", "Reply during processing");
+      expect(f.comment(c.id).status).toBe("submitted");
+      expect(store.get<any>("batch", batch.id).items[0].thread).toEqual([]);
+      f.update(batch.id, lease.leaseToken!, "modified", c.id, "Fixed", "component");
+      store.transaction(() => f.published(batch.id, "v2"));
+      expect(f.comment(c.id).status).toBe("draft");
+      expect(f.comment(c.id).results[0].revisionId).toBe("v2");
+      expect(f.prepare("follow-up").items[0].thread.filter(t => t.author === "user")).toHaveLength(2);
+    }));
+
   it("records explicit deletion locations only on published modifications and preserves original anchors", () =>
     fixture((s, f) => {
       const original = { ...target, context: { anchor: { selector: "#removed" } } };

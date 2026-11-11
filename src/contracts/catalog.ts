@@ -19,6 +19,14 @@ export const entrySchema = z.object({
   hash: z.string().default(""),
 });
 const entries = z.record(id, entrySchema);
+export const pageNavigationNodeSchema = z.object({
+  id,
+  pageId: id.optional(),
+  name: z.string().trim().min(1).optional(),
+  get children(): z.ZodOptional<z.ZodArray<typeof pageNavigationNodeSchema>> {
+    return z.array(pageNavigationNodeSchema).optional();
+  },
+});
 export const manifestSchema = z.object({
   schemaVersion: z.literal(1),
   id,
@@ -33,6 +41,7 @@ export const manifestSchema = z.object({
       }),
     )
     .min(1),
+  pageNavigation: z.array(pageNavigationNodeSchema).optional(),
   pages: z
     .array(
       z.object({

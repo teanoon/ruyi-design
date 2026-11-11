@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>如意设计 · Ruyi Design</title>
-    <link rel="icon" type="image/svg+xml" href="/ruyi-mark.svg" />
+    <link rel="icon" type="image/svg+xml" href="/ruyi-mark.svg?v=transparent-tight" />
   </head>
   <body>
     <a class="skip" href="#canvas">跳到预览</a>
@@ -17,10 +17,9 @@
           <span id="revision-description" class="sr-only"></span>
           <nav id="navigation" aria-label="设计导航"></nav>
           <div class="sidebar-footer">
-            <span id="activity" role="status">连接中</span>
             <div class="workspace-brand" aria-label="如意设计 · Ruyi Design">
               <img src="/ruyi-mark.svg" alt="如意设计" width="36" height="36" />
-              <strong>如意设计</strong><small>RUYI DESIGN</small>
+              <strong>如意设计</strong><span id="activity" class="connection-status" role="status" data-state="pending"><span class="connection-state-label">连接中</span></span>
             </div>
           </div>
         </aside>

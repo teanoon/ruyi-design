@@ -1,0 +1,115 @@
+import assert from 'node:assert/strict';
+import {mkdtemp,mkdir,writeFile,readFile,rm} from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import {chromium} from 'playwright';
+import {ReviewServer,startSchema} from '../../dist/server/index.js';
+const root=await mkdtemp(path.join(os.tmpdir(),'ruyi-navigation-')),design=path.join(root,'design');
+await mkdir(design);
+const entry={path:'index.html'};
+const states=[{id:'default',name:'默认',entries:{desktop:entry,mobile:entry}},{id:'empty',name:'空数据',entries:{desktop:entry}}];
+const pages=Array.from({length:10},(_,i)=>[{id:`parent-${i}`,name:i===0?'订单管理':`菜单 ${i}`,states},...Array.from({length:5},(_,j)=>({id:`child-${i}-${j}`,name:j===0?'设置':j===1?'这是一个用于检查窄屏换行的很长的子页面名称':`业务 ${i}-${j}`,states}))]).flat();
+const pageNavigation=Array.from({length:10},(_,i)=>({id:`nav-${i}`,pageId:`parent-${i}`,children:Array.from({length:5},(_,j)=>({id:`nav-${i}-${j}`,pageId:`child-${i}-${j}`}))}));
+// A pure group is nested under the final parent; page identity stays unchanged.
+pageNavigation[9].children=[{id:'pure',name:'更多配置',children:pageNavigation[9].children}];
+let manifest={schemaVersion:1,id:'navigation-test',name:'Navigation',devices:[{id:'desktop',name:'桌面',width:1280,height:800},{id:'mobile',name:'手机',width:390,height:844}],pages,pageNavigation};
+await writeFile(path.join(design,'manifest.json'),JSON.stringify(manifest));
+await writeFile(path.join(design,'index.html'),'<!doctype html><html><head><title>Navigation fixture</title></head><body><h1>Navigation fixture</h1><button data-review-id="target">评论目标</button><input id="input"/></body></html>');
+const server=await ReviewServer.start(startSchema.parse({projectRoot:root,designRoot:design}));
+const browser=await chromium.launch();
+const errors=[];
+try {
+ const page=await browser.newPage(); page.setDefaultTimeout(10000);page.on('pageerror',e=>errors.push(e.message));
+ const frame=()=>page.frameLocator('iframe').first();
+ const current=()=>new URL(page.url()).searchParams.get('id');
+ const nav=page.locator('[data-page-navigation]');
+ const select=id=>nav.locator(`[data-page-id="${id}"]`).click();
+ const toggle=id=>nav.locator(`[data-nav-focus="toggle:${id}"]`);
+ const search=()=>page.getByRole('searchbox',{name:'搜索页面'});
+ await page.goto(server.info().reviewUrl);await frame().getByRole('heading').waitFor();
+ assert.equal(await nav.locator('.page-count').textContent(),'60');
+ assert.equal(await nav.locator('.page-tree-count').first().textContent(),'5');
+ assert.equal(await toggle('nav-0').getAttribute('aria-expanded'),'false');
+ await select('parent-0');assert.equal(current(),'parent-0');assert.equal(await toggle('nav-0').getAttribute('aria-expanded'),'false');
+ await toggle('nav-0').click();await select('child-0-0');await frame().getByRole('heading').waitFor();
+ await frame().getByRole('button',{name:'评论目标',exact:true}).click();
+ await page.getByLabel('评论内容',{exact:true}).fill('折叠后保留草稿');
+ const beforeUrl=page.url();const historyLength=await page.evaluate(()=>history.length);
+ const frameName=await page.locator('iframe').getAttribute('name');
+ await toggle('nav-0').click();assert.equal(current(),'child-0-0');assert.equal(page.url(),beforeUrl);
+ assert.equal(await page.evaluate(()=>history.length),historyLength);assert.equal(await page.locator('iframe').getAttribute('name'),frameName);
+ assert.equal(await page.getByLabel('评论内容',{exact:true}).inputValue(),'折叠后保留草稿');
+ assert.equal(await nav.locator('[aria-current="page"]').isVisible(),false);
+ assert.equal(await nav.locator('.has-current').count(),1);
+ await page.getByRole('button',{name:'保存评论',exact:true}).click();await page.getByText('折叠后保留草稿',{exact:true}).waitFor();
+ assert.equal(await toggle('nav-0').getAttribute('aria-expanded'),'false');
+ await toggle('nav-1').click();await toggle('nav-2').click();await page.reload();await frame().getByRole('heading').waitFor();
+ for(const id of ['nav-0','nav-1','nav-2'])assert.equal(await toggle(id).getAttribute('aria-expanded'),'true');
+ await toggle('nav-0').click();
+ // IME composition must retain the original input element until committed.
+ await search().dispatchEvent('compositionstart');
+ const composingInput=await search().elementHandle();
+ await search().evaluate(input=>{input.value='订单管理';input.dispatchEvent(new InputEvent('input',{bubbles:true,isComposing:true}));});
+ assert(await composingInput.evaluate(input=>input.isConnected));
+ await search().dispatchEvent('compositionend');
+ assert.equal(await nav.locator('[data-page-id]:visible').count(),6);
+ await search().fill('');
+ await search().fill('设置');assert.equal(await nav.locator('[data-page-id^="child-"]:visible').count(),10);
+ assert.equal(await toggle('nav-0').getAttribute('aria-expanded'),'true');
+ await select('child-1-0');assert.equal(await search().inputValue(),'设置');
+ await search().fill('订单管理');assert.equal(await nav.locator('[data-page-id]:visible').count(),6);
+ await search().fill('不存在的页面');assert.equal(await page.getByRole('status').filter({hasText:'没有匹配的页面'}).count(),1);
+ await search().fill('');assert.equal(await toggle('nav-0').getAttribute('aria-expanded'),'false');
+ // Focus and native editing stay local to navigation.
+ await toggle('nav-0').focus();const device=await page.locator('#device').inputValue();
+ await page.keyboard.press('ArrowRight');assert.equal(await page.locator('#device').inputValue(),device);
+ await page.keyboard.press('Space');assert.equal(await toggle('nav-0').getAttribute('aria-expanded'),'true');
+ assert.equal(await page.evaluate(()=>document.activeElement.dataset.navFocus),'toggle:nav-0');
+ await nav.locator('[data-page-id="parent-0"]').focus();await page.keyboard.press('Enter');assert.equal(current(),'parent-0');
+ await nav.locator('[data-page-id="child-0-0"]').focus();
+ await toggle('nav-0').evaluate(button=>button.click());
+ assert.equal(await page.evaluate(()=>document.activeElement.dataset.navFocus),'toggle:nav-0');
+ await search().fill('c');await search().press('ArrowDown');assert.equal(await page.locator('#state').inputValue(),'default');
+ await search().fill('');
+ // Pure groups only toggle, with no URL or iframe change.
+ await toggle('nav-9').click();const pureUrl=page.url();await nav.getByRole('button',{name:'更多配置',exact:true}).click();assert.equal(page.url(),pureUrl);assert.equal(await toggle('pure').getAttribute('aria-expanded'),'true');
+ // URL restoration, comments, versions and directory moves retain page identity.
+ if(await toggle('nav-0').getAttribute('aria-expanded')==='false')await toggle('nav-0').click();
+ await select('child-0-0');await frame().getByRole('heading').waitFor();
+ const original=server.info().revisionId;
+ const commentsBefore=structuredClone(server.session.context().comments);
+ await search().fill('菜单 8');
+ await page.getByRole('button',{name:'定位',exact:true}).click();await frame().getByRole('heading').waitFor();
+ assert.equal(await search().inputValue(),'');assert.equal(current(),'child-0-0');assert.equal(await nav.locator('[aria-current="page"]').isVisible(),true);
+ const next=structuredClone(manifest);
+ next.pageNavigation[0].children=next.pageNavigation[0].children.filter(n=>n.pageId!=='child-0-0');
+ next.pageNavigation[3].children.push({id:'moved-settings',pageId:'child-0-0'});
+ await writeFile(path.join(design,'manifest.json'),JSON.stringify(next));
+ await server.publish({source:'conversation',request:'Move settings to another menu',idempotencyKey:'navigation-move',expectedBaseRevision:original});
+ await page.waitForFunction(()=>document.querySelector('[data-nav-node="moved-settings"] [aria-current="page"]'));
+ assert.equal(await toggle('nav-3').getAttribute('aria-expanded'),'true');
+ assert.deepEqual(server.session.context().comments,commentsBefore);
+ await search().fill('菜单 8');await page.getByRole('button',{name:'查看原版本',exact:true}).click();
+ await page.getByRole('button',{name:'返回最新版本',exact:true}).waitFor();
+ assert.equal(await search().inputValue(),'');assert.equal(await toggle('nav-0').getAttribute('aria-expanded'),'true');
+ assert.equal(await nav.locator('[data-nav-node="moved-settings"]').count(),0);
+ await page.getByRole('button',{name:'返回最新版本',exact:true}).click();
+ assert.equal(await nav.locator('[data-nav-node="moved-settings"] [aria-current="page"]').isVisible(),true);
+ await select('parent-0');await select('parent-1');await page.goBack();assert.equal(current(),'parent-0');
+ await nav.locator('[data-page-id="parent-0"][aria-current="page"]').waitFor();
+ const historical=await page.request.get(`${server.internalPreviewBase}/r/${original}/manifest.json`);
+ assert.deepEqual((await historical.json()).pageNavigation,manifest.pageNavigation);
+ await mkdir('test-results/navigation',{recursive:true});
+ for (const width of [1280,390]) {
+  await page.setViewportSize({width,height:900});await search().fill('这是一个');
+  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+  assert(await nav.evaluate(n=>n.scrollWidth<=n.clientWidth+1));
+  await page.screenshot({path:`test-results/navigation/runtime-${width}.png`,fullPage:true});
+ }
+ // Local preferences are optional; disabled storage must not prevent navigation.
+ const blocked=await browser.newContext();await blocked.addInitScript(()=>{Storage.prototype.getItem=()=>{throw Error('blocked')};Storage.prototype.setItem=()=>{throw Error('blocked')}});
+ const blockedPage=await blocked.newPage();await blockedPage.goto(server.info().reviewUrl);
+ await blockedPage.frameLocator('iframe').getByRole('heading').waitFor();await blockedPage.getByRole('button',{name:'展开订单管理',exact:true}).click();await blockedPage.locator('[data-page-id="child-0-1"]').click();assert.equal(new URL(blockedPage.url()).searchParams.get('id'),'child-0-1');await blocked.close();
+ assert.deepEqual(errors,[]);
+ console.log('Page navigation passed: 60 pages, independent parent selection/folding, no frame/URL/draft changes on fold, preference restore, search paths/reset, pure groups, keyboard focus, comment and historical/current version location, directory moves, history, immutable snapshots, narrow-screen layout, disabled storage.');
+} finally {await browser.close();await server.close();await rm(root,{recursive:true,force:true});}

@@ -1,0 +1,7 @@
+/* Text-only connection capsule replaces the English brand subtitle. */
+.workspace-brand>.connection-status[role="status"]{grid-column:2;grid-row:2;display:inline-flex;align-items:center;justify-content:center;justify-self:start;width:fit-content;max-width:100%;min-width:0;min-height:0;margin:0;padding:1px 7px;border:1px solid var(--color-line);border-radius:999px;background:var(--color-primary-soft);color:var(--color-muted);font-family:inherit;font-size:10px;line-height:1.5;letter-spacing:0;text-align:center;white-space:normal}
+.workspace-brand>.connection-status[role="status"]::before,.workspace-brand>.connection-status[role="status"]::after{content:none;display:none}
+.connection-state-label{min-width:0;overflow-wrap:anywhere}
+.workspace-brand>.connection-status[role="status"][data-state="reconnecting"]{background:var(--color-history-bg,#fff8e6);color:var(--color-history-text,#78500b)}
+.workspace-brand>.connection-status[role="status"][data-state="error"]{background:#faeeeb;color:var(--color-danger)}
+@media(max-width:440px){.workspace-brand>.connection-status[role="status"]{font-size:9px;padding-inline:5px}}

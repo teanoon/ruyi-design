@@ -44,7 +44,10 @@
     "release:prepare": "node scripts/release.mjs prepare",
     "release:publish": "node scripts/release.mjs publish",
     "test:discovery": "node tests/integration/browser-discovery.mjs",
-    "test:release": "node --test tests/release/*.test.mjs"
+    "test:release": "node --test tests/release/*.test.mjs",
+    "test:navigation": "node tests/browser/page-navigation.mjs",
+    "test:focus": "node tests/browser/review-focus.mjs",
+    "test:comments": "node tests/browser/review-comments.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
