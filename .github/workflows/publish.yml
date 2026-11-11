@@ -1,5 +1,8 @@
 name: Publish npm package
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       version:
@@ -28,10 +31,14 @@ concurrency:
   cancel-in-progress: false
 jobs:
   prepare:
-    if: github.repository == 'teanoon/ruyi-design' && github.ref == 'refs/heads/main' && inputs.confirm_license_and_scope
+    if: >-
+      github.repository == 'teanoon/ruyi-design' &&
+      ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && !github.event.deleted) ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_license_and_scope))
     runs-on: ubuntu-latest
     outputs:
       sha: ${{ steps.target.outputs.sha }}
+      version: ${{ steps.target.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -47,6 +54,9 @@ jobs:
         env:
           RELEASE_REF: ${{ inputs.ref }}
           RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_CONFIRMED: ${{ inputs.confirm_license_and_scope }}
+          RELEASE_DELETED: ${{ github.event.deleted }}
         run: node scripts/release-ref.mjs
       - uses: actions/checkout@v4
         with:
@@ -55,8 +65,8 @@ jobs:
       - run: npm ci --ignore-scripts
       - name: Prepare and accept one archive
         env:
-          RELEASE_VERSION: ${{ inputs.version }}
-          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_VERSION: ${{ steps.target.outputs.version }}
+          RELEASE_TAG: ${{ steps.target.outputs.tag }}
         run: node scripts/release.mjs prepare --version "$RELEASE_VERSION" --tag "$RELEASE_TAG" --skip-browser-checks
       - uses: actions/upload-artifact@v4
         with:
@@ -89,7 +99,7 @@ jobs:
           path: dist
       - name: Upload accepted bytes and verify npmjs metadata
         env:
-          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
           NODE_AUTH_TOKEN: ''
           NPM_TOKEN: ''
           NPM_CONFIG_USERCONFIG: /tmp/ruyi-empty-npmrc
