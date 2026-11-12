@@ -27,9 +27,28 @@ if (config && window.parent !== window) {
     );
   const outline = document.createElement("div");
   outline.setAttribute(BRAND.overlayAttribute, "");
+  outline.setAttribute("aria-hidden", "true");
+  const topLayer = typeof outline.showPopover === "function";
+  if (topLayer) outline.setAttribute("popover", "manual");
   outline.style.cssText =
-    `position:fixed;pointer-events:none;border:2px solid ${BRAND_COLORS.primary};background:${BRAND_COLORS.primary}14;z-index:2147483647;display:none;box-sizing:border-box`;
-  const show = (r: { x: number; y: number; width: number; height: number }, deleted = false) => {
+    `all:initial;position:fixed;inset:auto;margin:0;max-width:none;max-height:none;pointer-events:none;border:2px solid ${BRAND_COLORS.primary};background:${BRAND_COLORS.primary}14;z-index:2147483647;display:none;box-sizing:border-box`;
+  let highlighted: Element | undefined;
+  const visible = (target: Element) => target.getClientRects().length > 0 &&
+    target.checkVisibility?.({ visibilityProperty: true }) !== false;
+  const hide = () => {
+    highlighted = undefined;
+    if (topLayer && outline.matches(":popover-open")) outline.hidePopover();
+    outline.style.display = "none";
+  };
+  const show = (r: { x: number; y: number; width: number; height: number }, deleted = false, target?: Element) => {
+    // A modal makes nodes outside its DOM subtree inert. Keep the helper in
+    // that subtree, then promote it without moving the prototype's elements.
+    const host = target?.closest("dialog:modal") ?? document.body;
+    if (outline.parentElement !== host) {
+      hide();
+      host.append(outline);
+    }
+    highlighted = target;
     outline.textContent = deleted ? "此处已删除" : "";
     Object.assign(outline.style, {
       display: "block",
@@ -44,6 +63,7 @@ if (config && window.parent !== window) {
       font: "600 12px/1.5 system-ui, sans-serif",
       padding: deleted ? "6px" : "0",
     });
+    if (topLayer && !outline.matches(":popover-open")) outline.showPopover();
   };
   const key = (e: Element) =>
     e.getAttribute("data-review-id")
@@ -111,6 +131,16 @@ if (config && window.parent !== window) {
   };
   const loaded = () => {
     document.body.append(outline);
+    const style = document.createElement("style");
+    style.textContent = `[${BRAND.overlayAttribute}]::backdrop{background:transparent!important;pointer-events:none!important}`;
+    document.head.append(style);
+    // Ignore our own mutations to avoid observer/render loops.
+    new MutationObserver(records => {
+      if (!highlighted || !records.some(record => record.target !== outline &&
+        !(record.type === "childList" && [...record.addedNodes, ...record.removedNodes].every(node => node === outline)))) return;
+      if (!highlighted.isConnected || !visible(highlighted)) hide();
+    }).observe(document.body, { subtree: true, childList: true, attributes: true,
+      attributeFilter: ["open", "hidden", "style", "class"] });
     send("ready");
   };
   if (document.readyState === "loading")
@@ -141,7 +171,7 @@ if (config && window.parent !== window) {
     }
     if (m.type === "mode") {
       mode = m.payload;
-      outline.style.display = "none";
+      hide();
     }
     if (m.type === "capture") {
       try {
@@ -201,27 +231,28 @@ if (config && window.parent !== window) {
         const a = m.payload.deletion ?? m.payload;
         const matches = document.querySelectorAll(a.selector);
         if (matches.length !== 1) {
-          outline.style.display = "none";
+          hide();
           send("located", { ok: false });
           return;
         }
         const e = matches[0];
         if ((a.reviewId && e.getAttribute("data-review-id") !== a.reviewId) ||
           (a.tag && e.tagName !== a.tag.toUpperCase())) {
-          outline.style.display = "none";
+          hide();
           send("located", { ok: false });
           return;
         }
-        if (!e.getClientRects().length) {
-          outline.style.display = "none";
+        if (!visible(e)) {
+          hide();
           send("located", { ok: false });
           return;
         }
         e.scrollIntoView({ block: "center" });
         const deleted = !!m.payload.deletion;
-        show(e.getBoundingClientRect(), deleted);
+        show(e.getBoundingClientRect(), deleted, e);
         send("located", { ok: true, kind: deleted ? "deleted" : "element" });
       } catch {
+        hide();
         send("located", { ok: false });
       }
     }
@@ -238,7 +269,7 @@ if (config && window.parent !== window) {
           height: Math.abs(e.clientY - start.y),
         });
       else if (e.target instanceof Element)
-        show(e.target.getBoundingClientRect());
+        show(e.target.getBoundingClientRect(), false, e.target);
     },
     true,
   );
@@ -291,6 +322,7 @@ if (config && window.parent !== window) {
       if (mode !== "element" || !(e.target instanceof Element)) return;
       const el = e.target,
         r = el.getBoundingClientRect();
+      show(r, false, el);
       send("selection", {
         anchor: {
           kind: "element",
@@ -329,7 +361,7 @@ if (config && window.parent !== window) {
       }
       if (e.key === "Escape") {
         start = undefined;
-        outline.style.display = "none";
+        hide();
       }
       if (
         mode === "element" &&
@@ -348,6 +380,14 @@ if (config && window.parent !== window) {
   document.addEventListener("submit", e => {
     if (mode === "readonly") { e.preventDefault(); e.stopImmediatePropagation(); }
   }, true);
+  // Re-promote on the next selection after another top-layer element opens.
+  // Do not hide/show on every pointermove, which would churn the top layer.
+  for (const event of ["beforetoggle", "close"]) {
+    document.addEventListener(event, e => {
+      if (e.target instanceof Element && e.target !== outline &&
+        e.target.matches("dialog,[popover]")) hide();
+    }, true);
+  }
   bindShortcuts(window, () => ({ preview: mode === "experience", inCanvas: true }), action => {
     if (!allowedShortcuts.has(action)) return false;
     send("shortcut", { action, id: crypto.randomUUID() });

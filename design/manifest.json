@@ -298,6 +298,60 @@
               }
             }
           }
+        },
+        {
+          "id": "popup-dialog",
+          "name": "弹出层评论 · 模态弹窗",
+          "entries": {
+            "desktop": {
+              "path": "pages/popup-review.html",
+              "query": {
+                "state": "dialog"
+              }
+            },
+            "mobile": {
+              "path": "pages/popup-review.html",
+              "query": {
+                "state": "dialog"
+              }
+            }
+          }
+        },
+        {
+          "id": "popup-popover",
+          "name": "弹出层评论 · Popover",
+          "entries": {
+            "desktop": {
+              "path": "pages/popup-review.html",
+              "query": {
+                "state": "popover"
+              }
+            },
+            "mobile": {
+              "path": "pages/popup-review.html",
+              "query": {
+                "state": "popover"
+              }
+            }
+          }
+        },
+        {
+          "id": "popup-overlay",
+          "name": "弹出层评论 · 普通浮层",
+          "entries": {
+            "desktop": {
+              "path": "pages/popup-review.html",
+              "query": {
+                "state": "overlay"
+              }
+            },
+            "mobile": {
+              "path": "pages/popup-review.html",
+              "query": {
+                "state": "overlay"
+              }
+            }
+          }
         }
       ]
     }

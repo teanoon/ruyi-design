@@ -194,7 +194,7 @@ try {
   assert.equal(forbidden.statusCode, 403);
   const unauthenticated = await browser.newPage();
   await unauthenticated.goto(app.info().reviewUrl.split("#")[0]);
-  await unauthenticated.getByText("工作区连接失败", { exact: true }).waitFor();
+  await unauthenticated.getByText("连接失败", { exact: true }).waitFor();
   await unauthenticated.getByText("请从 AI 客户端提供的评审链接打开工作区。", { exact: true }).waitFor();
   await unauthenticated.close();
 } catch (e) {

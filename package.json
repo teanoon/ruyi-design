@@ -1,6 +1,6 @@
 {
   "name": "@littlehobby/ruyi-design",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "如意设计 · Ruyi Design — local interactive prototype preview and review",
   "type": "module",
   "license": "Apache-2.0",
@@ -49,7 +49,8 @@
     "test:release": "node --test tests/release/*.test.mjs",
     "test:navigation": "node tests/browser/page-navigation.mjs",
     "test:focus": "node tests/browser/review-focus.mjs",
-    "test:comments": "node tests/browser/review-comments.mjs"
+    "test:comments": "node tests/browser/review-comments.mjs",
+    "test:popup-comments": "node tests/browser/popup-comments.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",

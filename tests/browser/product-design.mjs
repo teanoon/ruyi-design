@@ -37,6 +37,19 @@ try{
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`Overflow: ${combo.objectId}/${combo.stateId||combo.exampleId}/${combo.deviceId}`);
   assert(await page.locator('h1').count(),`Empty entry ${entry}`);
   assert(await page.evaluate(()=>[...document.querySelectorAll('[data-page-navigation] [aria-controls]')].every(node=>document.querySelectorAll(`[id="${node.getAttribute('aria-controls')}"]`).length===1)),'Each navigation disclosure controls one unique list');
+  if(combo.stateId?.startsWith('popup-')){
+   await page.locator('#letter-popup').waitFor({state:'visible'});
+   await page.getByLabel('你的邮箱',{exact:true}).fill('review@example.com');
+   await page.getByRole('button',{name:'订阅来信',exact:true}).click();
+   await page.getByText('已为你留好位置，期待下一封来信。',{exact:true}).waitFor();
+   const saved=await page.evaluate(()=>window.ruyiDesignReviewState.exportState());
+   await page.getByRole('button',{name:'关闭来信弹窗',exact:true}).click();
+   await page.locator('#letter-popup').waitFor({state:'hidden'});
+   await page.evaluate(s=>window.ruyiDesignReviewState.restoreState(s),saved);
+   await page.locator('#letter-popup').waitFor({state:'visible'});
+   assert.equal(await page.getByLabel('你的邮箱',{exact:true}).inputValue(),'review@example.com');
+   await page.screenshot({path:`test-results/product-design/${combo.stateId}-${combo.deviceId}.png`,fullPage:true});
+  }
  }
  for(const [width,id] of [[1280,'desktop'],[390,'mobile']]){
   await page.setViewportSize({width,height:900});await page.goto(url(),{waitUntil:'networkidle'});

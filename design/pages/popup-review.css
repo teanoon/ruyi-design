@@ -1,0 +1,28 @@
+.popup-review{min-height:100vh}
+.letter-page{max-width:1120px;margin:auto;padding:36px 48px}
+.letter-header,.letter-footer{display:flex;align-items:center;justify-content:space-between;gap:20px}
+.letter-header strong{font-size:19px;letter-spacing:2px}
+.letter-header strong span{display:block;font-size:9px;letter-spacing:3px;font-weight:400}
+.letter-header>span,.letter-footer{font-size:11px;color:var(--color-muted)}
+.letter-hero{display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:52px;padding:80px 0}
+.letter-hero h1{font-size:48px;font-weight:500;line-height:1.45;letter-spacing:3px;margin:20px 0}
+.letter-hero p{color:var(--color-muted);line-height:2}
+.letter-hero img{width:100%;border-radius:var(--radius-panel)}
+.letter-hero .button{margin-top:20px;min-height:44px;padding-inline:20px}
+.letter-footer{padding-top:24px;border-top:1px solid var(--color-line);letter-spacing:1px}
+.letter-popup{width:min(440px,calc(100vw - 40px));max-height:calc(100vh - 48px);overflow:auto;margin:auto;padding:36px;border:1px solid var(--color-line);border-radius:var(--radius-panel);background:var(--color-surface);color:var(--color-text);box-shadow:0 24px 80px #263c3226}
+.letter-popup::backdrop{background:#263c3266}
+.letter-popup[popover]{position:fixed;inset:0}
+.letter-popup .eyebrow{margin-top:4px;color:var(--color-wood)}
+.letter-popup h2{font-size:28px;line-height:1.5;font-weight:500;letter-spacing:1px;margin:18px 0 12px}
+.letter-popup .letter-copy{font-size:14px;line-height:1.9;color:var(--color-muted);margin:0 0 28px}
+.letter-popup label{display:grid;gap:8px;font-size:13px}
+.letter-popup input{min-width:0;width:100%;min-height:44px;padding:10px 12px;border:1px solid var(--color-control);border-radius:var(--radius-control);background:var(--color-surface)}
+.letter-popup form>.button{width:100%;min-height:44px;margin-top:16px}
+.letter-popup .letter-note{font-size:11px;line-height:1.8;color:var(--color-muted);margin:16px 0 0}
+.letter-close{position:absolute;top:12px;right:12px;width:36px;height:36px;background:transparent;border-radius:var(--radius-control);font-size:24px;color:var(--color-muted)}
+.letter-close:hover{background:var(--color-primary-soft)}
+.letter-success{margin:16px 0 0;color:var(--color-primary);font-size:13px}
+.letter-scrim{position:fixed;inset:0;z-index:2147483646;background:#263c3266}
+.letter-popup[data-layer="overlay"]{position:fixed;inset:0;z-index:2147483647;height:max-content}
+@media(max-width:600px){.letter-page{padding:24px}.letter-header>span{display:none}.letter-hero{grid-template-columns:1fr;gap:28px;padding:44px 0}.letter-hero h1{font-size:34px}.letter-hero img{max-height:220px;object-fit:cover}.letter-popup{padding:32px 24px}.letter-popup h2{font-size:25px}.letter-footer{font-size:9px;gap:12px}}
