@@ -1,16 +1,16 @@
-import { mountShell, toast } from "../components/shell.js";
+import { clearToast, mountShell, toast } from "../components/shell.js";
 import { createButton } from "../components/button.js";
 import { createProjectCard, projects } from "../components/project-card.js";
 import { createProjectDialog } from "../components/dialog.js";
 import { emptyState, skeletonCards, taskList } from "../components/states.js";
 import { icon } from "../components/icons.js";
-const state = new URLSearchParams(location.search).get("state") ?? "default";
-let filter = "all",
+let state,
+  currentProjects,
+  filter = "all",
   query = "";
-const currentProjects =
-  state === "empty" ? [] : projects.map((p) => ({ ...p }));
 const content = document.createElement("div"),
   stats = document.createElement("div");
+const statNumbers = [];
 stats.className = "stats-grid";
 for (const [label, value, detail, glyph] of [
   ["全部项目", "3", "本月新增 1 个", "folder"],
@@ -25,7 +25,7 @@ for (const [label, value, detail, glyph] of [
   const number = document.createElement("div");
   number.className = "stat-number";
   const strong = document.createElement("strong");
-  strong.textContent = state === "empty" ? "0" : value;
+  statNumbers.push({ element: strong, value });
   const small = document.createElement("small");
   small.textContent = detail;
   number.append(strong, small);
@@ -46,13 +46,13 @@ for (const [id, label] of [
 ]) {
   const b = document.createElement("button");
   b.className = "tab";
+  b.dataset.filter = id;
   b.setAttribute("role", "tab");
   b.setAttribute("aria-selected", String(id === filter));
   b.textContent = label;
   b.onclick = () => {
     filter = id;
-    for (const tab of tabs.children)
-      tab.setAttribute("aria-selected", String(tab === b));
+    renderFilter();
     renderProjects();
   };
   tabs.append(b);
@@ -93,9 +93,14 @@ const dialog = createProjectDialog({
   },
 });
 document.body.append(dialog);
+function renderFilter() {
+  for (const tab of tabs.children)
+    tab.setAttribute("aria-selected", String(tab.dataset.filter === filter));
+  searchInput.value = query;
+}
 function renderProjects() {
   grid.replaceChildren();
-  stats.querySelector("strong").textContent = String(currentProjects.length);
+  statNumbers[0].element.textContent = String(currentProjects.length);
   const navCount = document.querySelector(".nav-count");
   if (navCount) navCount.textContent = String(currentProjects.length);
   if (state === "loading") {
@@ -151,17 +156,21 @@ const tasks = document.createElement("section");
 tasks.className = "panel";
 tasks.innerHTML =
   '<h2 class="panel-title">今天的重点 <small>一步一步，保持前进</small></h2>';
-tasks.append(
-  taskList({
-    items: [
-      { id: "task-review", name: "完成首页设计评审", date: "今天" },
-      { id: "task-tokens", name: "整理组件与颜色令牌", date: "今天" },
-      { id: "task-research", name: "准备下一轮用户访谈", date: "明天" },
-    ],
-    onChange: (_id, done) =>
-      toast(done ? "又完成了一件重要的小事。" : "任务已重新打开。"),
-  }),
-);
+const tasksHeading = tasks.firstElementChild;
+function renderTasks() {
+  tasks.replaceChildren(
+    tasksHeading,
+    taskList({
+      items: [
+        { id: "task-review", name: "完成首页设计评审", date: "今天" },
+        { id: "task-tokens", name: "整理组件与颜色令牌", date: "今天" },
+        { id: "task-research", name: "准备下一轮用户访谈", date: "明天" },
+      ],
+      onChange: (_id, done) =>
+        toast(done ? "又完成了一件重要的小事。" : "任务已重新打开。"),
+    }),
+  );
+}
 const activity = document.createElement("section");
 activity.className = "panel";
 activity.innerHTML =
@@ -186,21 +195,41 @@ for (const [name, text, time] of [
   activity.append(row);
 }
 below.append(tasks, activity);
-if (state === "default") content.append(below);
+const newProject = createButton({
+  label: "新建项目",
+  icon: icon("plus", 16),
+  id: "new-project",
+  onClick: () => dialog.showModal(),
+});
 mountShell({
   active: "home",
   title: "早上好，小满",
   subtitle: "把注意力留给重要的事，今天也向前一步。",
-  action: createButton({
-    label: "新建项目",
-    icon: icon("plus", 16),
-    id: "new-project",
-    state: ["loading", "error"].includes(state) ? "disabled" : "default",
-    onClick: () => dialog.showModal(),
-  }),
+  action: newProject,
   content,
 });
-renderProjects();
+function applyHomeState({ query: entryQuery }) {
+  state = entryQuery.state ?? "default";
+  currentProjects = state === "empty" ? [] : projects.map((project) => ({ ...project }));
+  filter = "all";
+  query = "";
+  if (dialog.open) dialog.close();
+  dialog.querySelector("form").reset();
+  dialog.querySelector("#project-name").removeAttribute("aria-invalid");
+  dialog.querySelector('[role="alert"]').textContent = "";
+  clearToast();
+  for (const { element, value } of statNumbers)
+    element.textContent = state === "empty" ? "0" : value;
+  newProject.disabled = state === "loading" || state === "error";
+  newProject.dataset.state = newProject.disabled ? "disabled" : "default";
+  if (state === "default") {
+    renderTasks();
+    content.append(below);
+  } else below.remove();
+  renderFilter();
+  renderProjects();
+  scrollTo(0, 0);
+}
 window.ruyiDesignReviewState = {
   exportState: () => ({
     filter,
@@ -211,21 +240,13 @@ window.ruyiDesignReviewState = {
   restoreState: (s) => {
     filter = s.filter ?? "all";
     query = s.query ?? "";
-    searchInput.value = query;
     for (const p of s.created ?? [])
       if (!currentProjects.some((x) => x.id === p.id))
         currentProjects.unshift(p);
-    for (const tab of tabs.children)
-      tab.setAttribute(
-        "aria-selected",
-        String(
-          tab.textContent ===
-            { all: "全部项目", progress: "进行中", completed: "已完成" }[
-              filter
-            ],
-        ),
-      );
+    renderFilter();
     renderProjects();
     if (s.dialogOpen && !dialog.open) dialog.showModal();
   },
 };
+applyHomeState({ query: Object.fromEntries(new URLSearchParams(location.search)) });
+window.ruyiDesignApplyState = applyHomeState;

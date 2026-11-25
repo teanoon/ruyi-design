@@ -41,6 +41,19 @@ Use shared CSS and ES modules for components, with `data-review-id` on stable in
 
 The service injects a version-1 bridge into HTML responses and leaves source HTML unchanged. Bridge envelopes contain `channel: ruyi-design`, `version: 1`, `frameId`, `type`, and optional payload. Parent and iframe check origin, window source and frame identity. Component examples run in separate iframes.
 
+### In-place page state changes
+
+To opt in, register `window.ruyiDesignApplyState` before the document finishes initializing. When the workspace switches between states of the same page, device, revision and HTML entry, it calls the handler with `{ stateId, query, hash }`. Render from those values and reset any state-specific state such as timers, forms or dialogs. Use the same rendering logic when initializing from the entry URL so each state can also be opened directly.
+
+```js
+applyState({ query: Object.fromEntries(new URLSearchParams(location.search)) });
+window.ruyiDesignApplyState = ({ query }) => applyState({ query });
+```
+
+The handler may return immediately or await rendering. Returning `false`, throwing, timing out, or navigating the document causes the workspace to load the declared entry. The workspace updates its shareable state link on success. Use the handler arguments for the new state inside the iframe, since its document URL can retain the initial parameters. Existing pages can continue initializing entirely from their entry URL.
+
+### Custom restoration
+
 Optional custom restoration:
 
 ```js

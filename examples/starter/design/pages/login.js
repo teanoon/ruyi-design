@@ -1,13 +1,25 @@
 import { createButton } from "../components/button.js";
 import { createInput } from "../components/input.js";
-const state = new URLSearchParams(location.search).get("state") ?? "default";
-const email = createInput({
+let email, password, submit, timer;
+const feedback = document.querySelector("#feedback");
+const recovery = document.querySelector("#recovery");
+const recoveryForm = document.querySelector("#recovery-form");
+const recoveryMessage = document.querySelector("#recovery-message");
+
+function applyLoginState({ query }) {
+  const state = query.state ?? "default";
+  clearTimeout(timer);
+  if (recovery.open) recovery.close();
+  recoveryForm.reset();
+  recoveryMessage.textContent = "";
+  feedback.textContent = "";
+  email = createInput({
     error: state === "error" ? "请输入有效的邮箱地址" : "",
     value: state === "error" ? "xiaoman@" : "",
     placeholder: "you@studio.design",
     required: true,
     disabled: state === "loading",
-  }),
+  });
   password = createInput({
     label: "密码",
     type: "password",
@@ -16,37 +28,38 @@ const email = createInput({
     required: true,
     disabled: state === "loading",
   });
-const submit = createButton({
-  label: "登录工作空间",
-  id: "login-submit",
-  type: "submit",
-  state: state === "loading" ? "loading" : "default",
-});
-document.querySelector("#fields").append(email, password);
-document.querySelector("#submit").append(submit);
-let timer;
+  submit = createButton({
+    label: "登录工作空间",
+    id: "login-submit",
+    type: "submit",
+    state: state === "loading" ? "loading" : "default",
+  });
+  document.querySelector("#fields").replaceChildren(email, password);
+  document.querySelector("#submit").replaceChildren(submit);
+  document.querySelector("#remember").checked = false;
+  scrollTo(0, 0);
+}
 document.querySelector("#login-form").addEventListener("submit", (e) => {
   e.preventDefault();
   const input = email.querySelector("input"),
     pass = password.querySelector("input");
   if (!input.value.trim() || !input.validity.valid) {
-    document.querySelector("#feedback").textContent = "请填写有效的邮箱地址。";
+    feedback.textContent = "请填写有效的邮箱地址。";
     input.setAttribute("aria-invalid", "true");
     input.focus();
     return;
   }
   if (!pass.value) {
-    document.querySelector("#feedback").textContent = "请填写密码。";
+    feedback.textContent = "请填写密码。";
     pass.focus();
     return;
   }
-  document.querySelector("#feedback").textContent = "正在连接你的工作空间…";
+  feedback.textContent = "正在连接你的工作空间…";
   submit.disabled = true;
   submit.textContent = "正在登录…";
   timer = setTimeout(() => (location.href = "./home.html"), 500);
 });
-const recovery = document.querySelector("#recovery"),
-  field = createInput({
+const field = createInput({
     label: "登录邮箱",
     id: "recovery-email",
     placeholder: "you@studio.design",
@@ -71,13 +84,13 @@ document
 document.querySelector("#forgot-password").onclick = () => recovery.showModal();
 document.querySelector("#help").onclick = () => {
   recovery.showModal();
-  document.querySelector("#recovery-message").textContent =
+  recoveryMessage.textContent =
     "需要帮助？可先填写邮箱，找回你的工作空间。";
 };
-document.querySelector("#recovery-form").onsubmit = (e) => {
+recoveryForm.onsubmit = (e) => {
   e.preventDefault();
   const input = field.querySelector("input");
-  document.querySelector("#recovery-message").textContent =
+  recoveryMessage.textContent =
     input.value && input.validity.valid
       ? "重置指引已准备好，请检查你的邮箱。"
       : "请先填写有效的邮箱地址。";
@@ -85,11 +98,13 @@ document.querySelector("#recovery-form").onsubmit = (e) => {
 window.ruyiDesignReviewState = {
   exportState: () => ({
     recoveryOpen: recovery.open,
-    message: document.querySelector("#feedback").textContent,
+    message: feedback.textContent,
   }),
   restoreState: (s) => {
     clearTimeout(timer);
     if (s.recoveryOpen && !recovery.open) recovery.showModal();
-    document.querySelector("#feedback").textContent = s.message ?? "";
+    feedback.textContent = s.message ?? "";
   },
 };
+applyLoginState({ query: Object.fromEntries(new URLSearchParams(location.search)) });
+window.ruyiDesignApplyState = applyLoginState;

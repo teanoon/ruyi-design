@@ -1,18 +1,15 @@
-import { mountShell, toast } from "../components/shell.js";
+import { clearToast, mountShell, toast } from "../components/shell.js";
 import { createButton } from "../components/button.js";
 import { createBadge } from "../components/badge.js";
 import { projects } from "../components/project-card.js";
 import { taskList } from "../components/states.js";
 import { icon } from "../components/icons.js";
-const query = new URLSearchParams(location.search),
-  state = query.get("state") ?? "default",
-  project = projects.find((p) => p.id === query.get("project")) ?? projects[0];
+let project, selected, tasks;
 const content = document.createElement("div");
 const tabs = document.createElement("div");
 tabs.className = "tabs detail-tabs";
 tabs.setAttribute("role", "tablist");
 tabs.setAttribute("aria-label", "项目详情");
-let selected = state === "activity" ? "activity" : "overview";
 const body = document.createElement("div");
 for (const [id, label] of [
   ["overview", "项目概览"],
@@ -21,7 +18,6 @@ for (const [id, label] of [
   const b = document.createElement("button");
   b.className = "tab";
   b.setAttribute("role", "tab");
-  b.setAttribute("aria-selected", String(id === selected));
   b.textContent = label;
   b.onclick = () => {
     selected = id;
@@ -30,7 +26,7 @@ for (const [id, label] of [
   tabs.append(b);
 }
 content.append(tabs, body);
-const tasks = [
+const initialTasks = [
   {
     id: "detail-research",
     name: "梳理关键使用场景",
@@ -163,10 +159,8 @@ function render() {
   layout.append(left, aside);
   body.append(layout);
 }
-mountShell({
+const { heading, breadcrumbs } = mountShell({
   active: "projects",
-  section: "项目 / " + project.name,
-  title: project.name,
   subtitle: "共同创造更好的产品体验，每个细节都值得被认真对待。",
   action: createButton({
     label: "返回工作台",
@@ -177,7 +171,16 @@ mountShell({
   }),
   content,
 });
-render();
+function applyProjectState({ query }) {
+  project = projects.find((item) => item.id === query.project) ?? projects[0];
+  selected = query.state === "activity" ? "activity" : "overview";
+  tasks = initialTasks.map((task) => ({ ...task }));
+  heading.textContent = project.name;
+  breadcrumbs.textContent = "工作空间 / 项目 / " + project.name;
+  clearToast();
+  render();
+  scrollTo(0, 0);
+}
 window.ruyiDesignReviewState = {
   exportState: () => ({
     selected,
@@ -192,3 +195,5 @@ window.ruyiDesignReviewState = {
     render();
   },
 };
+applyProjectState({ query: Object.fromEntries(new URLSearchParams(location.search)) });
+window.ruyiDesignApplyState = applyProjectState;

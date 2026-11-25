@@ -1,6 +1,6 @@
 {
   "name": "@littlehobby/ruyi-design",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "description": "如意设计 · Ruyi Design — local interactive prototype preview and review",
   "type": "module",
   "license": "Apache-2.0",
@@ -32,6 +32,7 @@
     "test:codex": "node tests/integration/codex-smoke.mjs && node tests/integration/codex-interruption.mjs",
     "test:starter": "node tests/browser/starter.mjs",
     "test:gateway": "node tests/browser/gateway.mjs",
+    "test:preview-cache": "node tests/browser/preview-cache.mjs",
     "preview:starter": "node scripts/preview-starter.mjs",
     "prepack": "npm run build",
     "test:deleted": "node tests/browser/deleted.mjs",

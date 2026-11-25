@@ -5,10 +5,12 @@ import { commentActions, commentFacts, findElementComment, type CommentAction } 
 import { BRAND } from "../../contracts/brand.js";
 import "../styles/workspace.css";
 import "../../../design/components/connection-status.css";
-import { isBridgeMessage, type BridgeMessage } from "../../contracts/bridge.js";
-import { routedUrl } from "../../contracts/urls.js";
+import { isBridgeMessage, type BridgeMessage, type StateRequest } from "../../contracts/bridge.js";
+import { previewHtmlCacheParam, routedUrl } from "../../contracts/urls.js";
+import { browserUuid } from "../uuid.js";
 import {
   combinations,
+  type Entry,
   type Manifest,
   type Target,
 } from "../../contracts/catalog.js";
@@ -65,9 +67,12 @@ let view: View = {
 };
 type Frame = {
   element: HTMLIFrameElement;
+  label: Text;
   target: Target;
-  entry: any;
+  entry: Entry;
   ready: boolean;
+  stateDocument?: string;
+  stateRequest?: string;
   height: number;
   resize?: () => void;
   restore?: any;
@@ -76,6 +81,14 @@ type Frame = {
   shortcutIds?: Set<string>;
 };
 const frames = new Map<string, Frame>();
+type PendingState = {
+  id: string;
+  frame: Frame;
+  next: View;
+  timer: ReturnType<typeof setTimeout>;
+};
+let pendingState: PendingState | undefined;
+let navigation = 0;
 let locateTimer: ReturnType<typeof setTimeout> | undefined;
 function notice(text: string, tone: "info" | "error" | "warning" = "info") {
   const node = el("notice");
@@ -121,14 +134,13 @@ function message(frame: Frame, type: BridgeMessage["type"], payload?: any) {
     context.previewSandboxed ? "*" : new URL(context.previewBase).origin,
   );
 }
-function choose(next: View, reveal = false) {
-  clearTimeout(locateTimer);
-  const m = displayedRevision().manifest as Manifest;
-  if (next.kind === "component") {
-    const available = m.devices.filter(d => m.components.find(c => c.id === next.id)?.examples.some(e => e.entries[d.id]));
-    if (!available.some(d => d.id === next.device) && available.length) next = { ...next, device: available[0].id };
-  }
-  view = next;
+function cancelStateSwitch() {
+  const pending = pendingState;
+  clearTimeout(pending?.timer);
+  pendingState = undefined;
+  return pending;
+}
+function writeViewUrl(replace = false) {
   const q = new URLSearchParams({
     session,
     kind: view.kind,
@@ -141,9 +153,23 @@ function choose(next: View, reveal = false) {
     q.set("revision", historicalRevision.id);
     if (originalCommentId) q.set("comment", originalCommentId);
   }
-  history.pushState(null, "", `?${q}`);
+  const url = `?${q}${location.hash}`;
+  if (replace) history.replaceState(null, "", url);
+  else history.pushState(null, "", url);
+}
+function choose(next: View, reveal = false, existingFrame?: Frame) {
+  navigation++;
+  cancelStateSwitch();
+  clearTimeout(locateTimer);
+  const m = displayedRevision().manifest as Manifest;
+  if (next.kind === "component") {
+    const available = m.devices.filter(d => m.components.find(c => c.id === next.id)?.examples.some(e => e.entries[d.id]));
+    if (!available.some(d => d.id === next.device) && available.length) next = { ...next, device: available[0].id };
+  }
+  view = next;
+  writeViewUrl();
   renderNav(reveal);
-  renderCanvas();
+  renderCanvas(undefined, existingFrame);
 }
 let pageNavigation: ReturnType<typeof mountPageNavigation>;
 const pageNavigationHost = document.createElement("div");
@@ -201,7 +227,16 @@ function renderNav(reveal = false) {
     .find(n => n.dataset.navFocus === navFocus && !n.closest("[hidden]"))?.focus({preventScroll: true});
 
 }
-function frameCard(entry: any, target: Target, name: string, restore?: any) {
+function previewUrl(entry: Entry, revisionId: string) {
+  const url = routedUrl(context.previewBase, `r/${revisionId}/${entry.path}`);
+  for (const [name, value] of Object.entries(entry.query ?? {}))
+    url.searchParams.set(name, value);
+  if (context.previewHtmlCacheScope && !url.searchParams.has(previewHtmlCacheParam))
+    url.searchParams.set(previewHtmlCacheParam, context.previewHtmlCacheScope);
+  url.hash = entry.hash ?? "";
+  return url;
+}
+function frameCard(entry: Entry, target: Target, name: string, restore?: any) {
   const device = (displayedRevision().manifest as Manifest).devices.find(
     (d) => d.id === target.deviceId,
   )!;
@@ -211,7 +246,8 @@ function frameCard(entry: any, target: Target, name: string, restore?: any) {
   card.style.marginInline = "auto";
   const heading = document.createElement("div");
   heading.className = "card-heading";
-  heading.textContent = name;
+  const label = document.createTextNode(name);
+  heading.append(label);
   const dims = document.createElement("span");
   dims.textContent = target.kind === "component" ? `${device.width}px 宽 · 高度自适应` : `${device.width} × ${device.height}`;
   heading.append(dims);
@@ -220,7 +256,7 @@ function frameCard(entry: any, target: Target, name: string, restore?: any) {
   fit.className = "frame-fit";
   const iframe = document.createElement("iframe");
   iframe.title = name;
-  iframe.name = crypto.randomUUID();
+  iframe.name = browserUuid();
   iframe.width = String(device.width);
   iframe.height = String(device.height);
   iframe.style.width = device.width + "px";
@@ -231,16 +267,10 @@ function frameCard(entry: any, target: Target, name: string, restore?: any) {
       ? "allow-scripts allow-forms allow-modals"
       : "allow-scripts allow-same-origin allow-forms allow-modals",
   );
-  const url = routedUrl(
-    context.previewBase,
-    `r/${target.revisionId}/${entry.path}`,
-  );
-  for (const [k, v] of Object.entries(entry.query ?? {}))
-    url.searchParams.set(k, String(v));
-  url.hash = entry.hash ?? "";
-  iframe.src = url.href;
+  iframe.src = previewUrl(entry, target.revisionId).href;
   frames.set(iframe.name, {
     element: iframe,
+    label,
     target,
     entry,
     ready: false,
@@ -259,7 +289,7 @@ function frameCard(entry: any, target: Target, name: string, restore?: any) {
   frames.get(iframe.name)!.resize = resize;
   new ResizeObserver(resize).observe(fit);
 }
-function renderCanvas(restores = new Map<string, any>()) {
+function renderCanvas(restores = new Map<string, any>(), existingFrame?: Frame) {
   if (historicalRevision && mode === "experience") {
     mode = "element";
     if (composerBeforePreview) el("composer").hidden = false;
@@ -275,8 +305,10 @@ function renderCanvas(restores = new Map<string, any>()) {
   if (historicalRevision) previewButton.removeAttribute("aria-keyshortcuts");
   else previewButton.setAttribute("aria-keyshortcuts", "C");
   renderMode();
-  frames.clear();
-  el("canvas").replaceChildren();
+  if (!existingFrame) {
+    frames.clear();
+    el("canvas").replaceChildren();
+  }
   const m = displayedRevision().manifest as Manifest;
   const states = el<HTMLSelectElement>("state");
   const page = m.pages.find((p) => p.id === view.id);
@@ -382,7 +414,13 @@ function renderCanvas(restores = new Map<string, any>()) {
   }
   for (const c of all) {
     const target = { ...c, revisionId: displayedRevision().id };
-    frameCard(c.entry, target, c.name, restores.get(c.name));
+    if (existingFrame) {
+      existingFrame.target = target;
+      existingFrame.entry = c.entry;
+      existingFrame.label.data = c.name;
+      existingFrame.element.title = c.name;
+      message(existingFrame, "shortcuts", availableShortcuts());
+    } else frameCard(c.entry, target, c.name, restores.get(c.name));
   }
 }
 function placeComposer() {
@@ -409,8 +447,19 @@ function compose(target: Target, comment?: any) {
   el("comment-text").focus();
 }
 async function locateComment(comment: any, original = false) {
+  const requested = ++navigation;
+  const pending = cancelStateSwitch();
+  if (pending) el<HTMLSelectElement>("state").value = view.state ?? "";
   const target = comment.target as Target;
-  const revision = original ? await api(`revisions/${encodeURIComponent(target.revisionId)}`) : context.revision;
+  let revision;
+  try {
+    revision = original ? await api(`revisions/${encodeURIComponent(target.revisionId)}`) : context.revision;
+  } catch (error) {
+    if (requested !== navigation) return;
+    if (pending) renderCanvas();
+    throw error;
+  }
+  if (requested !== navigation) return;
   const combo = combinations(revision.manifest).find((c) =>
     c.kind === target.kind && c.objectId === target.objectId &&
     c.deviceId === target.deviceId &&
@@ -421,7 +470,7 @@ async function locateComment(comment: any, original = false) {
       historicalRevision = undefined;
       originalCommentId = undefined;
       choose(latestAvailableView(), true);
-    }
+    } else if (pending) renderCanvas();
     notice("评论对应的页面、状态或设备已不存在，原版本上下文仍保留。", "warning");
     return;
   }
@@ -568,6 +617,14 @@ window.addEventListener("message", (e) => {
     f = frames.get(m.frameId);
   if (!f || e.source !== f.element.contentWindow) return;
   if (m.type === "ready") {
+    const documentId = typeof m.payload?.documentId === "string" && m.payload.canApplyState === true
+      ? m.payload.documentId
+      : undefined;
+    if (pendingState?.frame === f && documentId !== f.stateDocument) {
+      choose(pendingState.next);
+      return;
+    }
+    f.stateDocument = documentId;
     f.ready = true;
     if (f.target.kind === "component") message(f, "measure");
     message(f, "mode", historicalRevision ? "readonly" : mode);
@@ -577,6 +634,14 @@ window.addEventListener("message", (e) => {
       f.restore = undefined;
       message(f, "restore", restore);
     } else locateInFrame(f);
+  }
+  if (m.type === "state-applied") {
+    const pending = pendingState;
+    if (pending?.frame !== f || m.payload?.id !== pending.id || m.payload.documentId !== f.stateDocument) return;
+    const applied = m.payload.ok === true && f.target.revisionId === displayedRevision().id;
+    if (applied) f.stateRequest = undefined;
+    choose(pending.next, false, applied ? f : undefined);
+    return;
   }
   if (m.type === "shortcut" && isShortcutAction(m.payload?.action) && typeof m.payload.id === "string" && m.payload.id.length > 0 && m.payload.id.length <= 80) {
     const seen = f.shortcutIds ??= new Set<string>();
@@ -594,7 +659,7 @@ window.addEventListener("message", (e) => {
       f.resize?.();
     }
   }
-  if (m.type === "selection" && !historicalRevision) {
+  if (m.type === "selection" && !historicalRevision && !f.stateRequest) {
     const target = { ...f.target, context: m.payload };
     const existing = findElementComment(context.comments, target);
     if (existing?.status === "draft" && !commentFacts(existing, context.batches).busy) compose(existing.target, existing);
@@ -623,13 +688,13 @@ window.addEventListener("message", (e) => {
       : historicalRevision ? "已在原版本中定位元素。" : "已切换到评论对应的设计并定位元素。", !m.payload.ok ? "error" : m.payload.kind === "deleted" ? "warning" : "info");
   }
 });
-function latestAvailableView(): View {
+function latestAvailableView(requested = view): View {
   const m = context.revision.manifest as Manifest;
-  if (view.kind === "tokens") return { ...view, device: m.devices.some(d => d.id === view.device) ? view.device : m.devices[0].id };
+  if (requested.kind === "tokens") return { ...requested, device: m.devices.some(d => d.id === requested.device) ? requested.device : m.devices[0].id };
   const all = combinations(m);
-  const current = all.find(c => c.kind === view.kind && c.objectId === view.id && c.deviceId === view.device && (c.kind !== "page" || c.stateId === view.state));
-  if (current) return view;
-  const fallback = all.find(c => c.kind === view.kind && c.objectId === view.id) ?? all[0];
+  const current = all.find(c => c.kind === requested.kind && c.objectId === requested.id && c.deviceId === requested.device && (c.kind !== "page" || c.stateId === requested.state));
+  if (current) return requested;
+  const fallback = all.find(c => c.kind === requested.kind && c.objectId === requested.id) ?? all[0];
   return fallback ? { kind: fallback.kind, id: fallback.objectId, state: fallback.kind === "page" ? fallback.stateId : undefined, device: fallback.deviceId } : { kind: "tokens", id: "tokens", device: m.devices[0].id };
 }
 async function updateRevision() {
@@ -638,6 +703,7 @@ async function updateRevision() {
     notice("新版本已发布，可返回最新版本查看；当前保留原版本对照。");
     return;
   }
+  if (pendingState) choose(pendingState.next);
   const restores = new Map<string, any>();
   await Promise.all(
     [...frames.values()].map(
@@ -656,6 +722,13 @@ async function updateRevision() {
   const old = context.revision.id;
   await refresh();
   if (old === context.revision.id) return;
+  if (historicalRevision) return;
+  const pending = cancelStateSwitch();
+  if (pending) {
+    choose(latestAvailableView(pending.next), true);
+    notice("已自动更新到最新版本，等待你复核。");
+    return;
+  }
   const next = latestAvailableView();
   if (next !== view) {
     choose(next, true);
@@ -746,14 +819,43 @@ function selectDevice(device?: string): boolean {
   choose({ ...view, device }); return true;
 }
 function selectState(id?: string): boolean {
-  if (!id || view.kind !== "page" || id === view.state) return false;
-  const target = (displayedRevision().manifest as Manifest).pages.find(p => p.id === view.id)?.states.find(s => s.id === id);
+  if (!id || view.kind !== "page" || id === (pendingState?.next.state ?? view.state)) return false;
+  const revision = displayedRevision();
+  const target = (revision.manifest as Manifest).pages.find(p => p.id === view.id)?.states.find(s => s.id === id);
   if (!target) return false;
-  choose({ ...view, state: target.id, device: target.entries[view.device] ? view.device : Object.keys(target.entries)[0] }); return true;
+  const entry = target.entries[view.device];
+  const next = { ...view, state: target.id, device: entry ? view.device : Object.keys(target.entries)[0] };
+  const frame = frames.values().next().value;
+  if (!entry || !frame?.ready || !frame.stateDocument || frame.stateRequest || frame.locate ||
+      frame.target.kind !== "page" || frame.target.objectId !== view.id ||
+      frame.target.deviceId !== next.device || frame.target.revisionId !== revision.id ||
+      frame.entry.path !== entry.path) {
+    choose(next);
+    return true;
+  }
+  const from = previewUrl(frame.entry, revision.id);
+  const to = previewUrl(entry, revision.id);
+  if (context.previewSandboxed && from.searchParams.get("port") !== to.searchParams.get("port")) {
+    choose(next);
+    return true;
+  }
+  const request: StateRequest = {
+    id: browserUuid(),
+    documentId: frame.stateDocument,
+    from: from.href,
+    to: to.href,
+    state: { stateId: target.id, query: entry.query ?? {}, hash: to.hash },
+  };
+  navigation++;
+  const timer = setTimeout(() => choose(next), 1000);
+  pendingState = { id: request.id, frame, next, timer };
+  frame.stateRequest = request.id;
+  message(frame, "apply-state", request);
+  return true;
 }
 function shortcutDestination(action: ShortcutAction): string | undefined {
   if (action.startsWith("device-")) return view.kind === "tokens" ? undefined : adjacent([...el<HTMLSelectElement>("device").options].map(o => o.value), view.device, action === "device-next" ? 1 : -1);
-  if (action.startsWith("state-")) return view.kind !== "page" ? undefined : adjacent([...el<HTMLSelectElement>("state").options].map(o => o.value), view.state ?? "", action === "state-next" ? 1 : -1);
+  if (action.startsWith("state-")) return view.kind !== "page" ? undefined : adjacent([...el<HTMLSelectElement>("state").options].map(o => o.value), pendingState?.next.state ?? view.state ?? "", action === "state-next" ? 1 : -1);
 }
 function availableShortcuts(): ShortcutAction[] {
   if (!context) return [];
@@ -823,8 +925,11 @@ el("composer").onsubmit = async (e) => {
   }
 };
 el("return-latest").onclick = async () => {
+  const requested = ++navigation;
+  if (cancelStateSwitch()) renderCanvas();
   try {
     await refresh();
+    if (requested !== navigation) return;
     const comment = context.comments.find((c: any) => c.id === originalCommentId);
     if (comment) await locateComment(comment);
     else {
@@ -836,16 +941,20 @@ el("return-latest").onclick = async () => {
   } catch (error: any) { notice(error.message, "error"); }
 };
 window.onpopstate = async () => {
+  const requested = ++navigation;
+  const pending = cancelStateSwitch();
   const requestedUrl = location.href;
   const p = new URLSearchParams(location.search);
   try {
     const revisionId = p.get("revision");
     const revision = revisionId
       ? await api(`revisions/${encodeURIComponent(revisionId)}`) : undefined;
-    if (location.href !== requestedUrl) return;
+    if (requested !== navigation || location.href !== requestedUrl) return;
     historicalRevision = revision;
     originalCommentId = p.get("comment") ?? undefined;
   } catch (e: any) {
+    if (requested !== navigation) return;
+    if (pending) renderCanvas();
     notice(e.message, "error");
     return;
   }
@@ -878,6 +987,7 @@ async function init() {
     else view = { kind: "tokens", id: "tokens", device: m.devices[0].id };
   }
   if (!view.device) view.device = m.devices[0].id;
+  writeViewUrl(true);
   renderNav(true);
   renderCanvas();
   connected = true;

@@ -1,3 +1,5 @@
+export const previewHtmlCacheParam = "__ruyi_html_cache";
+
 /** Resolve an application path without discarding the gateway's routing query. */
 export function routedUrl(base: string, relative: string) {
   const source = new URL(base);

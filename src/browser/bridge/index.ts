@@ -1,10 +1,13 @@
 import { bindShortcuts, isShortcutAction, type ShortcutAction } from "../../contracts/shortcuts.js";
 import { BRAND, BRAND_COLORS } from "../../contracts/brand.js";
-import { isBridgeMessage, type BridgeMessage } from "../../contracts/bridge.js";
+import { isBridgeMessage, type BridgeMessage, type PreviewState, type StateRequest } from "../../contracts/bridge.js";
+import { previewHtmlCacheParam } from "../../contracts/urls.js";
+import { browserUuid } from "../uuid.js";
 
 declare global {
   interface Window {
-    __RUYI_DESIGN_CONFIG__?: { origin: string; sessionId: string };
+    __RUYI_DESIGN_CONFIG__?: { origin: string; sessionId: string; previewHtmlCacheScope?: string };
+    ruyiDesignApplyState?: (state: PreviewState) => void | boolean | Promise<void | boolean>;
     ruyiUxaiReviewState?: Window["ruyiDesignReviewState"];
     uxaiReviewState?: Window["ruyiDesignReviewState"];
     ruyiDesignReviewState?: {
@@ -17,6 +20,25 @@ const config = window[BRAND.configGlobal];
 const stateApi = () => window.ruyiDesignReviewState ?? window.ruyiUxaiReviewState ?? window.uxaiReviewState;
 if (config && window.parent !== window) {
   const frameId = window.name;
+  const documentId = browserUuid();
+  let appliedEntry: { document: URL; href: string } | undefined;
+  let applyingState = false;
+  function entryUrl() {
+    const actual = new URL(location.href);
+    const entry = appliedEntry;
+    if (!entry || actual.pathname !== entry.document.pathname || actual.search !== entry.document.search)
+      return actual;
+    // The effective entry also works in the opaque gateway frame, where changing the document URL can fail.
+    const effective = new URL(entry.href);
+    if (actual.hash !== entry.document.hash) effective.hash = actual.hash;
+    return effective;
+  }
+  function reviewedUrl() {
+    const url = entryUrl();
+    if (url.searchParams.get(previewHtmlCacheParam) === config?.previewHtmlCacheScope)
+      url.searchParams.delete(previewHtmlCacheParam);
+    return url;
+  }
   let mode = "experience";
   let allowedShortcuts = new Set<ShortcutAction>();
   let start: { x: number; y: number } | undefined;
@@ -82,10 +104,11 @@ if (config && window.parent !== window) {
       : e.tagName.toLowerCase();
   }
   function capture() {
+    const url = reviewedUrl();
     return {
-      path: location.pathname,
-      query: location.search,
-      hash: location.hash,
+      path: url.pathname,
+      query: url.search,
+      hash: url.hash,
       scroll: { x: scrollX, y: scrollY },
       fields: [...document.querySelectorAll("input,textarea,select")]
         .filter(
@@ -141,11 +164,35 @@ if (config && window.parent !== window) {
       if (!highlighted.isConnected || !visible(highlighted)) hide();
     }).observe(document.body, { subtree: true, childList: true, attributes: true,
       attributeFilter: ["open", "hidden", "style", "class"] });
-    send("ready");
+    send("ready", { documentId, canApplyState: typeof window.ruyiDesignApplyState === "function" });
   };
   if (document.readyState === "loading")
     document.addEventListener("DOMContentLoaded", loaded, { once: true });
   else loaded();
+  async function applyState(request: StateRequest) {
+    if (typeof request?.id !== "string" || request.documentId !== documentId) return;
+    const respond = (ok: boolean) => send("state-applied", { id: request.id, documentId, ok });
+    const apply = window.ruyiDesignApplyState;
+    const current = entryUrl();
+    if (applyingState || !apply || !request.state || request.from !== current.href) return respond(false);
+
+    applyingState = true;
+    hide();
+    const beforeApply = location.href;
+    try {
+      const target = new URL(request.to);
+      if (target.origin !== current.origin || target.pathname !== current.pathname)
+        return respond(false);
+      const applied = await apply(request.state);
+      if (applied === false || location.href !== beforeApply) return respond(false);
+      appliedEntry = { document: new URL(beforeApply), href: target.href };
+      respond(true);
+    } catch {
+      respond(false);
+    } finally {
+      applyingState = false;
+    }
+  }
   window.addEventListener("message", async (event) => {
     if (
       event.source !== window.parent ||
@@ -155,6 +202,7 @@ if (config && window.parent !== window) {
     )
       return;
     const m = event.data;
+    if (m.type === "apply-state") return applyState(m.payload);
     if (m.type === "measure" && !measuring) {
       measuring = true;
       const style = document.createElement("style");
@@ -216,8 +264,9 @@ if (config && window.parent !== window) {
       history.replaceState(
         null,
         "",
-        location.href.replace(/\/r\/[^/]+\//, `/r/${m.payload.revisionId}/`),
+        entryUrl().href.replace(/\/r\/[^/]+\//, `/r/${m.payload.revisionId}/`),
       );
+      appliedEntry = undefined;
       for (const link of document.querySelectorAll<HTMLLinkElement>(
         'link[rel="stylesheet"]',
       ))
@@ -319,7 +368,7 @@ if (config && window.parent !== window) {
       if (mode === "experience") return;
       e.preventDefault();
       e.stopImmediatePropagation();
-      if (mode !== "element" || !(e.target instanceof Element)) return;
+      if (applyingState || mode !== "element" || !(e.target instanceof Element)) return;
       const el = e.target,
         r = el.getBoundingClientRect();
       show(r, false, el);
@@ -342,7 +391,7 @@ if (config && window.parent !== window) {
             height: r.height,
           },
         },
-        url: location.href,
+        url: reviewedUrl().href,
         viewport: { width: innerWidth, height: innerHeight },
         state: capture(),
       });
@@ -390,7 +439,7 @@ if (config && window.parent !== window) {
   }
   bindShortcuts(window, () => ({ preview: mode === "experience", inCanvas: true }), action => {
     if (!allowedShortcuts.has(action)) return false;
-    send("shortcut", { action, id: crypto.randomUUID() });
+    send("shortcut", { action, id: browserUuid() });
     return true;
   });
 

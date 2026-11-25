@@ -1,5 +1,17 @@
 import { BRAND } from "./brand.js";
 export const BRIDGE_VERSION = 1;
+export type PreviewState = {
+  stateId: string;
+  query: Record<string, string>;
+  hash: string;
+};
+export type StateRequest = {
+  id: string;
+  documentId: string;
+  from: string;
+  to: string;
+  state: PreviewState;
+};
 export type BridgeMessage = {
   version: 1;
   channel: typeof BRAND.bridgeChannel;
@@ -10,6 +22,8 @@ export type BridgeMessage = {
     | "measure"
     | "resize"
     | "ready"
+    | "apply-state"
+    | "state-applied"
     | "mode"
     | "selection"
     | "capture"
@@ -34,6 +48,8 @@ export function isBridgeMessage(value: unknown): value is BridgeMessage {
       "measure",
       "resize",
       "ready",
+      "apply-state",
+      "state-applied",
       "mode",
       "selection",
       "capture",

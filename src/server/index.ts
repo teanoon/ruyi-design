@@ -4,7 +4,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 import { ReviewSession } from "../core/sessions/index.js";
 import { ensure, ReviewError } from "../core/errors.js";
@@ -13,7 +13,7 @@ import { targetSchema } from "../contracts/catalog.js";
 import type { Revision } from "../core/revisions/index.js";
 import { validateRequest } from "./security/index.js";
 import { validateRevision } from "./preview/validate.js";
-import { routedUrl } from "../contracts/urls.js";
+import { previewHtmlCacheParam, routedUrl } from "../contracts/urls.js";
 import { runtime } from "../core/runtime.js";
 import {
   gatewayHtml,
@@ -36,6 +36,12 @@ const mime: Record<string, string> = {
   ".woff2": "font/woff2",
   ".ico": "image/x-icon",
 };
+const cacheablePreviewExtensions = new Set([
+  ".css", ".js", ".mjs", ".woff", ".woff2", ".ttf",
+  ".svg", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".ico",
+]);
+const immutablePreviewCache = "private, max-age=3600, immutable";
+const publishedHtmlCache = "private, max-age=60, must-revalidate";
 export const startSchema = z.object({
   projectRoot: z.string(),
   designRoot: z.string(),
@@ -51,6 +57,8 @@ export class ReviewServer {
   control: FastifyInstance;
   preview: FastifyInstance;
   token = randomBytes(32).toString("hex");
+  private readonly previewHtmlCacheScope = randomBytes(16).toString("hex");
+  private bridgeAsset?: Promise<{ body: Buffer; version: string }>;
   base = "";
   previewBase = "";
   internalBase = "";
@@ -93,6 +101,15 @@ export class ReviewServer {
   context() {
     return { ...this.session.context(), runtime };
   }
+  private loadBridge() {
+    this.bridgeAsset ??= readFile(path.join(packageRoot, "dist/bridge/bridge.js"))
+      .then((body) => ({ body, version: createHash("sha256").update(body).digest("hex") }))
+      .catch((error) => {
+        this.bridgeAsset = undefined;
+        throw error;
+      });
+    return this.bridgeAsset;
+  }
   private async listen(o: StartOptions) {
     // A port-selecting gateway has one browser origin and one sticky upstream.
     // Keep all its traffic on the workspace port; opaque frames isolate scripts.
@@ -101,7 +118,7 @@ export class ReviewServer {
       new URL(o.publicBaseUrl).searchParams.has("port") &&
       !o.previewBaseUrl;
     const errors = (err: any, _req: any, reply: any) =>
-      reply.status(err.status ?? err.statusCode ?? 400).send({
+      reply.header("Cache-Control", "no-store").status(err.status ?? err.statusCode ?? 400).send({
         error: { code: err.code ?? "invalid_request", message: err.message, ...(err.details ? { details: err.details } : {}) },
       });
     this.control.setErrorHandler(errors);
@@ -120,11 +137,12 @@ export class ReviewServer {
       reply.header("Cache-Control", "no-store");
       reply.header("Referrer-Policy", "no-referrer");
     });
-    this.preview.get("/bridge.js", async (_req, reply) =>
-      reply
-        .type("text/javascript")
-        .send(await readFile(path.join(packageRoot, "dist/bridge/bridge.js"))),
-    );
+    this.preview.get("/bridge.js", async (req, reply) => {
+      const { body, version } = await this.loadBridge();
+      if (new URL(req.url, this.internalPreviewBase).searchParams.get("v") === version)
+        reply.header("Cache-Control", immutablePreviewCache);
+      return reply.type("text/javascript").send(body);
+    });
     this.preview.get("/r/:revision/*", async (req, reply) => {
       // Only requests multiplexed through the public gateway need URL rewriting.
       // Internal candidate validation must load resources from the local listener.
@@ -136,10 +154,8 @@ export class ReviewServer {
         "invalid_revision",
         "Invalid revision",
       );
-      const revision =
-        this.session.store.get<Revision>("revision", params.revision) ??
-        this.candidates.get(params.revision);
-      ensure(revision, "not_found", "Revision not found", 404);
+      const published = this.session.store.get<Revision>("revision", params.revision);
+      ensure(published || this.candidates.has(params.revision), "not_found", "Revision not found", 404);
       const root = path.join(
         this.session.dataRoot,
         "revisions",
@@ -153,11 +169,13 @@ export class ReviewServer {
         const config = JSON.stringify({
           origin: new URL(this.base).origin,
           sessionId: this.session.id,
+          previewHtmlCacheScope: this.previewHtmlCacheScope,
         }).replaceAll("<", "\\u003c");
+        const { version } = await this.loadBridge();
         const bridgePath = gatewayRequest
           ? "/_preview/bridge.js"
           : "/bridge.js";
-        const injection = `<script>window.${BRAND.configGlobal}=${config}</script><script src="${bridgePath}"></script>`;
+        const injection = `<script>window.${BRAND.configGlobal}=${config}</script><script src="${bridgePath}?v=${version}"></script>`;
         body = html.includes("</head>")
           ? html.replace("</head>", `${injection}</head>`)
           : injection + html;
@@ -171,6 +189,19 @@ export class ReviewServer {
         else if (ext === ".js" || ext === ".mjs")
           body = gatewayJavaScript(body.toString(), publicUrl);
         else if (ext === ".css") body = gatewayCss(body.toString(), publicUrl);
+      }
+      if (published && cacheablePreviewExtensions.has(ext.toLowerCase())) {
+        reply.header("Cache-Control", immutablePreviewCache);
+      }
+      if (published && ext === ".html" &&
+          new URL(req.url, this.internalPreviewBase).searchParams.get(previewHtmlCacheParam) === this.previewHtmlCacheScope) {
+        const tag = `"${createHash("sha256").update(body).digest("hex")}"`;
+        reply.header("Cache-Control", publishedHtmlCache).header("ETag", `W/${tag}`);
+        const validator = req.headers["if-none-match"];
+        if (validator?.trim() === "*" ||
+            validator?.split(",").some((value) => value.trim().replace(/^W\//, "") === tag)) {
+          return reply.code(304).send();
+        }
       }
       return reply.type(mime[ext] ?? "application/octet-stream").send(body);
     });
@@ -199,6 +230,7 @@ export class ReviewServer {
       ...this.context(),
       previewBase: this.previewBase,
       previewSandboxed: this.gatewayPreview,
+      previewHtmlCacheScope: this.previewHtmlCacheScope,
     }));
     this.control.get(`${prefix}/revisions/:revision`, async (req) => {
       const id = (req.params as { revision: string }).revision;
@@ -214,12 +246,18 @@ export class ReviewServer {
           headers: {
             host: new URL(this.internalPreviewBase).host,
             "x-ruyi-design-gateway-preview": "1",
+            ...(req.headers["if-none-match"] ? { "if-none-match": req.headers["if-none-match"] } : {}),
           },
         });
         // ES modules inside an opaque sandbox use Origin: null. Only public
         // prototype assets get this CORS response; the management API does not.
         reply.header("Access-Control-Allow-Origin", "null");
         reply.header("Cross-Origin-Resource-Policy", "cross-origin");
+        for (const name of ["cache-control", "etag"]) {
+          const value = response.headers[name];
+          if (typeof value === "string") reply.header(name, value);
+        }
+        if (response.statusCode === 304) return reply.code(304).send();
         return reply
           .code(response.statusCode)
           .type(

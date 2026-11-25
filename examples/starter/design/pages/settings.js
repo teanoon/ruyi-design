@@ -1,8 +1,7 @@
-import { mountShell, toast } from "../components/shell.js";
+import { clearToast, mountShell, toast } from "../components/shell.js";
 import { createButton } from "../components/button.js";
 import { createInput } from "../components/input.js";
 import { icon } from "../components/icons.js";
-const state = new URLSearchParams(location.search).get("state") ?? "default";
 const content = document.createElement("div");
 content.className = "settings-grid";
 const nav = document.createElement("nav");
@@ -10,13 +9,7 @@ nav.className = "settings-nav";
 nav.setAttribute("aria-label", "设置分类");
 const panel = document.createElement("section");
 panel.className = "panel settings-panel";
-let active = state === "notifications" ? "notifications" : "profile";
-const preferences = { updates: true, tasks: true, digest: true };
-const profileValues = {
-  name: "林小满",
-  email: state === "error" ? "xiaoman@" : "xiaoman@studio.design",
-  bio: "把复杂的事情，做得简单一点。",
-};
+let state, active, preferences, profileValues;
 for (const [key, label] of [
   ["profile", "个人资料"],
   ["notifications", "通知偏好"],
@@ -158,7 +151,19 @@ function render() {
   });
   panel.append(form);
 }
-render();
+function applySettingsState({ query }) {
+  state = query.state ?? "default";
+  active = state === "notifications" ? "notifications" : "profile";
+  preferences = { updates: true, tasks: true, digest: true };
+  profileValues = {
+    name: "林小满",
+    email: state === "error" ? "xiaoman@" : "xiaoman@studio.design",
+    bio: "把复杂的事情，做得简单一点。",
+  };
+  clearToast();
+  render();
+  scrollTo(0, 0);
+}
 window.ruyiDesignReviewState = {
   exportState: () => ({
     active,
@@ -179,3 +184,5 @@ window.ruyiDesignReviewState = {
     render();
   },
 };
+applySettingsState({ query: Object.fromEntries(new URLSearchParams(location.search)) });
+window.ruyiDesignApplyState = applySettingsState;

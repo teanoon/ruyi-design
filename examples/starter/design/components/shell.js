@@ -97,7 +97,16 @@ export function mountShell({
   main.append(heading, content);
   area.append(top, main);
   root.append(sidebar, area);
+  return { heading: h1, breadcrumbs: crumbs };
 }
+
+export function clearToast() {
+  const el = document.querySelector("#toast");
+  if (!el) return;
+  clearTimeout(el.timer);
+  el.remove();
+}
+
 export function toast(message) {
   let el = document.querySelector("#toast");
   if (!el) {
