@@ -109,15 +109,15 @@ export async function prepare({ root = process.cwd(), version, tag, run = comman
   const lock = JSON.parse(await readFile(path.join(root, "package-lock.json"), "utf8"));
   tag = validateMetadata(pkg, lock, version, tag);
   await assertUnpublished(pkg.version, fetcher);
+  // HTTP integration tests and the release archive use the built runtime.
+  run("npm", ["run", "build"], { cwd: root });
   const checks = Object.fromEntries(browserChecks.map(check => [check, includeBrowserChecks ? false : "skipped"]));
   for (const [check, script] of [["typecheck", "typecheck"], ["unit", "test"], ["release", "test:release"], ["browser", "test:browser"], ["conversation", "test:conversation"], ["gateway", "test:gateway"], ["discovery", "test:discovery"]]) {
     if (!includeBrowserChecks && browserChecks.includes(check)) continue;
-    // Browser scripts use the built runtime.
-    if (check === "browser") run("npm", ["run", "build"], { cwd: root });
     run("npm", ["run", script], { cwd: root }); checks[check] = true;
   }
   await mkdir(path.join(root, "dist"), { recursive: true });
-  run("npm", ["run", "pack:local"], { cwd: root });
+  run("npm", ["pack", "--pack-destination", "dist", "--ignore-scripts"], { cwd: root });
   const filename = `littlehobby-ruyi-design-${pkg.version}.tgz`;
   const tarball = path.join(root, "dist", filename);
   const info = await artifactInfo(tarball, run);

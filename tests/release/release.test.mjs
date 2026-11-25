@@ -127,8 +127,12 @@ for (const browserChecks of [false, true]) {
     };
     const prepared = await prepare({ root, browserChecks, run, fetcher: response(404) });
     assert.equal(prepared.validationProfile, browserChecks ? "full" : "package");
-    const scripts = calls.filter(([file, args]) => file === "npm" && args[0] === "run").map(([, args]) => args[1]);
-    assert.deepEqual(scripts, browserChecks ? ["typecheck", "test", "test:release", "build", "test:browser", "test:conversation", "test:gateway", "test:discovery", "pack:local"] : ["typecheck", "test", "test:release", "pack:local"]);
+    const scripts = ["build", "typecheck", "test", "test:release"];
+    if (browserChecks) scripts.push("test:browser", "test:conversation", "test:gateway", "test:discovery");
+    assert.deepEqual(calls.slice(0, scripts.length + 1), [
+      ...scripts.map(script => ["npm", ["run", script]]),
+      ["npm", ["pack", "--pack-destination", "dist", "--ignore-scripts"]],
+    ]);
     const install = calls.find(([file]) => file === process.execPath)[1];
     assert.equal(install.includes("--skip-browser-checks"), !browserChecks);
     for (const check of ["browser", "conversation", "gateway", "discovery"]) assert.equal(prepared.checks[check], browserChecks ? true : "skipped");
