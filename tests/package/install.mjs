@@ -37,6 +37,7 @@ for (const file of ["LICENSE", "THIRD_PARTY_NOTICES.md"]) {
 }
 assert(pack.files.every(file => !file.path.endsWith(".tgz")), "Release archives must not be nested in the npm package");
 assert(pack.files.every(file => !/^dist\/release-.*\.json$/.test(file.path)), "Release manifests must not enter the package");
+assert(pack.files.every(file => !file.path.startsWith("docs/articles/")), "Promotional articles must not enter the npm package");
 for (const file of pack.files)
   assert(
     !/^(src|tests|openspec|node_modules|\.codex-home|\.ruyi-design|\.ruyi-uxai|\.uxai-review)\//.test(

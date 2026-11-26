@@ -54,7 +54,7 @@ export async function verifyRuntime({ cli, packageJson, guidePath }) {
     assert.equal(first.comments.length, 0); assert.equal(first.batches.length, 0);
     const guide = (await client.readResource({ uri: "ruyi-design://guides/review" })).contents[0].text;
     assert.equal(guide, await readFile(guidePath, "utf8"));
-    assert(guide.includes("do not ask for an extra reopen click"));
+    assert.match(guide, /an eligible user follow-up automatically reopens a comment/i);
     const comment = await request(info, "comments", { method: "POST", body: JSON.stringify({ text: "Persist through restart", target: { kind: "page", objectId: "home", stateId: "default", deviceId: "desktop", revisionId: info.revisionId } }) });
     const saved = await context(info);
     assert.equal(saved.comments[0].id, comment.id);
