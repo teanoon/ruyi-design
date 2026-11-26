@@ -108,6 +108,80 @@ try{
   assert.equal((await page.evaluate(()=>window.ruyiDesignReviewState.exportState())).tab,'active');await page.getByRole('button',{name:'已归档 2',exact:true}).click();await page.getByRole('button',{name:'重新打开',exact:true}).first().click();
   await page.getByRole('button',{name:'查看原版本',exact:true}).first().click();await page.getByRole('button',{name:'返回最新版本',exact:true}).waitFor();
   await page.getByRole('button',{name:'返回最新版本',exact:true}).click();
+  for(const outcome of ['write-error','refresh-error']){
+   await page.goto(`${url('feedback-archived')}&commentSave=${outcome}`);
+   const archived=page.locator('[data-review-id="comment-headline"]');
+   const draft=page.getByLabel('添加元素评论',{exact:true});
+   const text=`归档之后的新反馈 ${outcome}`;
+   await page.locator('[data-review-id="sample-headline"]').click();
+   assert.equal(await draft.inputValue(),'');
+   assert(await draft.evaluate(node=>node===document.activeElement));
+   assert.equal((await page.evaluate(()=>window.ruyiDesignReviewState.exportState())).tab,'active');
+   await draft.fill(text);
+   await draft.press('Control+Enter');
+   await page.getByText(text,{exact:true}).waitFor();
+   assert.equal(await page.getByRole('button',{name:'正在保存…',exact:true}).count(),0);
+   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+   const pendingCard=page.locator('.comment-card').filter({hasText:text});
+   assert.equal(await pendingCard.getAttribute('data-status'),'待提交');
+   if(outcome==='write-error'){
+    const retry=pendingCard.getByRole('button',{name:'重新提交',exact:true});
+    await retry.waitFor();
+    assert.deepEqual(await pendingCard.locator('.comment-actions button').allTextContents(),['定位','编辑','重新提交']);
+    assert(await retry.evaluate(node=>node.classList.contains('danger')));
+    await pendingCard.getByRole('button',{name:'编辑',exact:true}).click();
+    assert.equal(await page.getByLabel('编辑评论',{exact:true}).inputValue(),text);
+    await page.getByRole('button',{name:'取消',exact:true}).click();
+    await retry.click();
+    await pendingCard.getByRole('button',{name:'存档',exact:true}).waitFor();
+    assert.equal(await pendingCard.getAttribute('data-status'),'待处理');
+   }else{
+    await page.getByText('评论已提交，列表同步失败。',{exact:true}).waitFor();
+    assert(await page.getByText(text,{exact:true}).isVisible());
+    await page.getByRole('button',{name:'重试刷新',exact:true}).click();
+   }
+   await page.getByText(text,{exact:true}).waitFor();
+   await page.getByRole('button',{name:/已归档/}).click();
+   await archived.getByRole('button',{name:'重新打开',exact:true}).click();
+   await page.getByRole('button',{name:'打开进行中的讨论',exact:true}).waitFor();
+   await archived.getByRole('button',{name:'回复',exact:true}).click();
+   await page.getByLabel('回复评论',{exact:true}).fill('从旧讨论来的回复');
+   await page.getByLabel('回复评论',{exact:true}).press('Control+Enter');
+   await page.getByRole('button',{name:'在已有讨论中补充',exact:true}).click();
+   assert.equal(await page.getByLabel('回复评论',{exact:true}).inputValue(),'从旧讨论来的回复');
+   const sameElement=(await page.evaluate(()=>window.ruyiDesignReviewState.exportState())).comments.filter(c=>c.target==='headline');
+   assert.deepEqual(sameElement.map(c=>c.status),['resolved','draft']);
+   assert(sameElement.every(c=>c.thread.length===0));
+  }
+  await page.goto(`${url()}&commentSave=slow`);
+  const previous=page.locator('[data-review-id="comment-headline"]');
+  await previous.getByRole('button',{name:'删除',exact:true}).click();
+  assert(await previous.getByRole('button',{name:'删除中',exact:true}).isDisabled());
+  await previous.waitFor({state:'detached'});
+  await page.locator('[data-review-id="sample-headline"]').click();
+  const replacement=page.getByLabel('添加元素评论',{exact:true});
+  assert.equal(await replacement.inputValue(),'');
+  await replacement.fill('删除后立即添加');
+  await replacement.press('Control+Enter');
+  const newCard=page.locator('.comment-card').filter({hasText:'删除后立即添加'});
+  await newCard.getByRole('button',{name:'编辑',exact:true}).click();
+  await page.getByLabel('编辑评论',{exact:true}).fill('刚创建就修改');
+  await page.getByLabel('编辑评论',{exact:true}).press('Control+Enter');
+  await page.getByText('刚创建就修改',{exact:true}).waitFor();
+  assert.equal(await previous.count(),0);
+  for(const [scene,label,pending] of [
+   ['default','删除','删除中'],
+   ['default','存档','存档中'],
+   ['feedback-archived','重新打开','打开中'],
+  ]){
+   await page.goto(`${url(scene)}&commentSave=write-error`);
+   const affected=page.locator('[data-review-id="comment-headline"]');
+   const initialState=await affected.getAttribute('data-status');
+   await affected.getByRole('button',{name:label,exact:true}).click();
+   assert(await affected.getByRole('button',{name:pending,exact:true}).isDisabled());
+   await affected.getByRole('button',{name:label,exact:true}).waitFor();
+   assert.equal(await affected.getAttribute('data-status'),initialState);
+  }
   await page.goto(`${server.internalPreviewBase}/r/${rev.id}/showcases/index.html?component=brand&state=default`);
   await page.getByRole('heading',{name:'如意方印 · 最终版',exact:true}).waitFor();
   assert.equal(await page.getByRole('button',{name:/选择方案/}).count(),0);

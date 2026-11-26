@@ -270,10 +270,10 @@ export class ReviewServer {
     }
     this.control.post(`${prefix}/comments`, async (req) => {
       const body = z
-        .object({ text: z.string(), target: targetSchema })
+        .object({ text: z.string(), target: targetSchema, id: z.uuid().optional() })
         .parse(req.body);
       this.session.validateTarget(body.target);
-      return this.session.feedback.add(body.text, body.target);
+      return this.session.feedback.add(body.text, body.target, body.id);
     });
     this.control.patch(`${prefix}/comments/:id`, async (req) => {
       const body = z.object({ text: z.string() }).parse(req.body);
@@ -287,12 +287,14 @@ export class ReviewServer {
         .object({
           action: z.enum(["resolve", "archive", "reopen", "reply", "cancel_reopen"]),
           message: z.string().max(20000).default(""),
+          messageId: z.uuid().optional(),
         })
         .parse(req.body);
       return this.session.feedback.review(
         (req.params as any).id,
         b.action,
         b.message,
+        b.messageId,
       );
     });
     this.control.get(`${prefix}/events`, async (req, reply) => {

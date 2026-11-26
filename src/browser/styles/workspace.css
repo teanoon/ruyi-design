@@ -387,6 +387,12 @@ iframe {
   padding: 7px 10px;
   min-height: 34px
 }
+.comment-feedback[data-tone="error"] {
+  color: var(--color-danger);
+}
+.comment-feedback > button {
+  margin-inline-start: 8px;
+}
 textarea {
   width: 100%;
   resize: vertical;

@@ -10,14 +10,37 @@ async function fixture(check: (f: Feedback, store: Store, root: string) => void 
   const store = new Store(root);
   try { await check(new Feedback(store), store, root); } finally { if (store.db.isOpen) store.close(); await rm(root, { recursive: true, force: true }); }
 }
-it("rejects duplicates including archived records and preserves original content", () => fixture((f, store) => {
-  const c = f.add("First", target); f.review(c.id, "archive");
-  expect(() => f.add("Another", { ...target, revisionId: "v2" })).toThrow(expect.objectContaining({ code: "comment_exists", details: { existingCommentId: c.id } }));
-  expect(store.all("comment")).toHaveLength(1);
-  expect(f.comment(c.id).text).toBe("First");
+it("creates a new discussion after archiving and rejects attempts to reopen an archived duplicate", () => fixture((f, store) => {
+  const c = f.add("First", target);
+  const archived = f.review(c.id, "archive");
+  const another = f.add("Another", { ...target, revisionId: "v2" });
+  const conflict = expect.objectContaining({ code: "comment_exists", details: { existingCommentId: another.id } });
+  const cursor = store.cursor();
+  expect(() => f.add("Duplicate", target)).toThrow(conflict);
+  expect(() => f.review(c.id, "reopen")).toThrow(conflict);
+  expect(() => f.review(c.id, "reply", "Keep my input")).toThrow(conflict);
+  expect(f.comment(c.id)).toEqual(archived);
+  expect(store.cursor()).toBe(cursor);
+  expect(f.comment(another.id).text).toBe("Another");
   f.add("Mobile", { ...target, deviceId: "mobile" });
   f.add("Child", { ...target, context: { anchor: { selector: "#one > span" } } });
-  expect(store.all("comment")).toHaveLength(3);
+  expect(store.all("comment")).toHaveLength(4);
+  f.review(another.id, "archive");
+  f.review(c.id, "reopen");
+  expect(() => f.add("Duplicate", target)).toThrow(expect.objectContaining({ details: { existingCommentId: c.id } }));
+}));
+it("replays the same create and reply without duplicating records or events", () => fixture((f, store) => {
+  const id = "e64d4d1f-c25a-4fc6-a9fa-42bda558fbac";
+  const messageId = "98ab256b-daa5-404a-b2ff-a3718362f723";
+  const first = f.add("Created once", target, id);
+  const creationCursor = store.cursor();
+  expect(f.add("Created once", target, id)).toEqual(first);
+  expect(store.cursor()).toBe(creationCursor);
+  const replied = f.review(id, "reply", "Also saved once", messageId);
+  const replyCursor = store.cursor();
+  expect(f.review(id, "reply", "Also saved once", messageId)).toEqual(replied);
+  expect(store.cursor()).toBe(replyCursor);
+  expect(replied.thread).toHaveLength(1);
 }));
 it("preserves legacy duplicates and their creation order across editing and store reopen", () => fixture((f, store, root) => {
   const c = f.add("First", target);

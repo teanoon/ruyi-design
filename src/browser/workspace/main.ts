@@ -1,7 +1,8 @@
 import { mountPageNavigation } from '../../../design/components/page-navigation.js';
 import '../../../design/components/page-navigation.css';
 import { adjacent, bindShortcuts, isShortcutAction, type ShortcutAction } from "../../contracts/shortcuts.js";
-import { commentActions, commentFacts, findElementComment, type CommentAction } from "../../contracts/comment-actions.js";
+import { commentActions, commentFacts, findElementComment, sameCommentElement, type CommentAction } from "../../contracts/comment-actions.js";
+import type { Comment } from "../../core/feedback/index.js";
 import { BRAND } from "../../contracts/brand.js";
 import "../styles/workspace.css";
 import "../../../design/components/connection-status.css";
@@ -428,23 +429,67 @@ function placeComposer() {
   for (const card of document.querySelectorAll<HTMLElement>("#comments .comment-card")) { card.classList.remove("editing"); card.classList.toggle("selected", card.dataset.commentId === activeCommentId); }
   const id = editing?.replace(/^reply:/, "");
   const card = [...document.querySelectorAll<HTMLElement>("#comments .comment-card")].find(c => c.dataset.commentId === id);
-  if (card && !composer.hidden) {
-    card.classList.add("editing");
+  if (card) {
+    if (!composer.hidden) card.classList.add("editing");
     card.querySelector(".comment-actions")!.before(composer);
   } else el("comments").before(composer);
 }
-function compose(target: Target, comment?: any) {
+function commentNotice(message: string, tone: "info" | "warning" | "error" = "info", action?: HTMLButtonElement) {
+  const host = el("comment-notice");
+  const status = host.querySelector("span")!;
+  host.querySelector("button")?.remove();
+  host.dataset.tone = tone;
+  status.setAttribute("role", tone === "error" ? "alert" : "status");
+  status.textContent = message;
+  if (action) {
+    action.type = "button";
+    host.append(action);
+  }
+}
+function closeComposer() {
+  el("composer").hidden = true;
+  composerBeforePreview = false;
+  editing = undefined;
+  selection = undefined;
+}
+function compose(target: Target, comment?: Comment, replyText?: string) {
+  commentNotice("");
   archiveSelected = comment?.status === "resolved";
   selection = structuredClone(target);
-  editing = comment?.id;
+  editing = comment && (replyText === undefined ? comment.id : `reply:${comment.id}`);
   activeCommentId = comment?.id;
   el("composer").hidden = false;
   el("target-label").textContent =
     `${target.kind} / ${target.objectId}${target.stateId ? " / " + target.stateId : ""}${target.exampleId ? " / " + target.exampleId : ""}`;
-  el<HTMLTextAreaElement>("comment-text").value = comment?.text ?? "";
-  placeComposer();
+  el<HTMLTextAreaElement>("comment-text").value = replyText ?? comment?.text ?? "";
   renderComments();
   el("comment-text").focus();
+}
+function showDiscussion(id: string) {
+  archiveSelected = false;
+  activeCommentId = id;
+  renderComments();
+  const card = [...document.querySelectorAll<HTMLElement>("#active-comments .comment-card")].find(card => card.dataset.commentId === id);
+  card?.scrollIntoView({ block: "nearest" });
+  card?.focus({ preventScroll: true });
+}
+function openConflictingDiscussion(id: string, text?: string, opened?: () => void) {
+  return button(text === undefined ? "打开进行中的讨论" : "在已有讨论中补充", async () => {
+    try {
+      await refresh();
+    } catch {
+      commentNotice("无法载入进行中的讨论，请重试。", "warning", text === undefined ? openConflictingDiscussion(id) : undefined);
+      return;
+    }
+    const existing = visibleComments().find(c => c.id === id && c.status !== "resolved");
+    if (!existing) return commentNotice(text === undefined ? "进行中的讨论已变化。" : "进行中的讨论已变化，当前输入已保留。", "warning");
+    if (text !== undefined) compose(existing.target, existing, text);
+    else {
+      commentNotice("");
+      showDiscussion(existing.id);
+    }
+    opened?.();
+  });
 }
 async function locateComment(comment: any, original = false) {
   const requested = ++navigation;
@@ -506,9 +551,11 @@ function locateInFrame(f: Frame) {
 let archiveSelected = false;
 function renderComments() {
   const list = el("comments");
-  list.before(el("composer"));
+  const composer = el("composer");
+  const focused = document.activeElement instanceof HTMLElement && composer.contains(document.activeElement) ? document.activeElement : undefined;
+  list.before(composer);
   list.replaceChildren();
-  const comments = [...context.comments].reverse() as any[];
+  const comments = visibleComments().reverse();
   const active = comments.filter((c) => c.status !== "resolved");
   const archived = comments.filter((c) => c.status === "resolved");
   el("count").textContent = String(archiveSelected ? archived.length : active.length);
@@ -541,15 +588,17 @@ function renderComments() {
     resolved: "已解决",
   };
   for (const c of comments) {
+    const submission = pendingBody(c.id);
+    const cardOperation = pendingCardAction(c.id);
     const card = document.createElement("article");
     card.className = "comment-card" + (activeCommentId === c.id ? " selected" : "");
     card.dataset.commentId = c.id;
-    card.dataset.status = c.status;
+    card.dataset.status = submission ? "pending-submission" : c.status;
     card.tabIndex = -1;
     const head = document.createElement("div");
     head.className = "comment-meta";
     const facts = commentFacts(c, context.batches);
-    const statusName = facts.busy ? (facts.processing ? "处理中" : "已纳入更新") : c.status === "resolved" && c.resolution === "archived" ? "已归档" : statusNames[c.status];
+    const statusName = submission ? "待提交" : facts.busy ? (facts.processing ? "处理中" : "已纳入更新") : c.status === "resolved" && c.resolution === "archived" ? "已归档" : statusNames[c.status];
     head.textContent = `${c.target.objectId} · ${c.target.deviceId ?? "令牌"} · ${statusName}`;
     const text = document.createElement("p");
     text.textContent = c.text;
@@ -562,44 +611,56 @@ function renderComments() {
     }
     const actions = document.createElement("div");
     actions.className = "comment-actions";
-    const labels: Record<CommentAction, string> = { locate: "定位", original: "查看原版本", edit: "编辑", delete: "删除", reply: "回复", resolve: "确认解决", reopen: "重新打开", cancel_reopen: "撤销重新打开" };
-    for (const action of commentActions(c, context.batches, context.revision.id)) {
-      actions.append(button(labels[action], async () => {
+    const labels: Record<CommentAction | "resubmit", string> = { locate: "定位", original: "查看原版本", edit: "编辑", delete: "删除", reply: "回复", resolve: "确认解决", archive: "存档", reopen: "重新打开", cancel_reopen: "撤销重新打开", resubmit: "重新提交" };
+    const available: (CommentAction | "resubmit")[] = commentActions(c, context.batches, context.revision.id);
+    const cardActions = submission
+      ? [...available.filter(action => action === "locate"), ...(submission.failed ? ["edit", "resubmit"] as const : [])]
+      : available;
+    for (const action of cardActions) {
+      const control = button(cardOperation?.action === action ? cardActionProgress[action] : labels[action], async () => {
         if (action === "locate" || action === "original") return locateComment(c, action === "original");
         if (action === "edit") return compose(c.target, c);
-        if (action === "reply") {
-          compose(c.target);
-          editing = `reply:${c.id}`;
-          activeCommentId = c.id;
-          archiveSelected = c.status === "resolved";
-          renderComments();
-          el("comment-text").focus();
+        if (action === "reply") return compose(c.target, c, "");
+        if (action === "resubmit") {
+          if (submission?.failed) {
+            commentChanges.delete(submission);
+            commentNotice("");
+            if (editing === c.id) closeComposer();
+            addCommentChange(submission);
+          }
           return;
         }
-        if (action === "delete") await api(`comments/${c.id}`, undefined, "DELETE");
-        else await api(`comments/${c.id}/review`, { action });
-        if (editing?.replace(/^reply:/, "") === c.id) {
-          el("composer").hidden = true;
-          composerBeforePreview = false;
-          editing = undefined;
-          selection = undefined;
+        if (action === "delete" || action === "archive" || action === "reopen" || action === "resolve") {
+          runCommentAction(c, action);
+          return;
         }
-        if (action === "reopen") archiveSelected = false;
+        const writes = [...commentChanges].filter(change => change.id === c.id && !change.acknowledged && !change.failed);
+        if (writes.length) await Promise.all(writes.map(change => change.task));
+        await api(`comments/${c.id}/review`, { action });
+        if (editing?.replace(/^reply:/, "") === c.id) closeComposer();
         if (action === "cancel_reopen") archiveSelected = c.previousDraft?.status === "resolved";
         await refresh();
-      }, action === "resolve" ? "primary" : action === "delete" ? "danger" : ""));
+      }, action === "resolve" ? "primary" : action === "delete" || action === "resubmit" ? "danger" : "");
+      control.disabled = !!cardOperation && action !== "locate" && action !== "original";
+      actions.append(control);
     }
     card.append(actions);
     (c.status === "resolved" ? archiveList : activeList).append(card);
   }
   placeComposer();
-  const drafts = comments.filter((c) => c.status === "draft").length;
+  if (focused && !composer.closest("[hidden]")) focused.focus({ preventScroll: true });
+  const drafts = comments.filter(c => c.status === "draft" && !pendingBody(c.id)).length;
   el("pending-count").textContent = drafts
     ? `${drafts} 条评论待处理`
     : "没有待处理评论";
 }
 async function refresh() {
-  context = await api("context");
+  const acknowledged = [...commentChanges].filter(change => change.acknowledged);
+  const next = await api("context");
+  if (context && next.cursor < context.cursor) return;
+  context = next;
+  for (const change of acknowledged) commentChanges.delete(change);
+  if (![...commentChanges].some(change => change.acknowledged)) el("comment-refresh-notice").replaceChildren();
   renderVersion();
   renderComments();
 }
@@ -661,15 +722,14 @@ window.addEventListener("message", (e) => {
   }
   if (m.type === "selection" && !historicalRevision && !f.stateRequest) {
     const target = { ...f.target, context: m.payload };
-    const existing = findElementComment(context.comments, target);
-    if (existing?.status === "draft" && !commentFacts(existing, context.batches).busy) compose(existing.target, existing);
+    const existing = findElementComment(visibleComments(), target);
+    if (existing?.status === "draft" && !commentFacts(existing, context.batches).busy &&
+        !pendingCardAction(existing.id) && pendingBody(existing.id)?.failed !== false)
+      compose(existing.target, existing);
     else if (existing) {
-      activeCommentId = existing.id;
-      archiveSelected = existing.status === "resolved";
-      renderComments();
-      const card = [...document.querySelectorAll<HTMLElement>(".comment-card")].find(card => card.dataset.commentId === existing.id);
-      card?.scrollIntoView({ block: "nearest" });
-      card?.focus({ preventScroll: true });
+      closeComposer();
+      commentNotice("");
+      showDiscussion(existing.id);
     } else compose(target);
   }
   if (m.type === "captured") {
@@ -801,7 +861,7 @@ function renderMode() {
   el("preview-label").textContent = preview ? "退出预览" : "预览";
   el("preview-toggle").setAttribute("aria-pressed", String(preview));
   el("canvas-mode-text").textContent = historicalRevision ? "原版本 · 只读查看" : preview ? "预览模式 · 直接体验页面" : "元素评论 · 点击即可留下想法";
-  el("interaction-hint").textContent = historicalRevision ? "正在查看原版本，返回最新版本后可继续评论。" : preview ? "正在体验设计，退出预览后可选择元素评论。" : "选择画布中的元素，已有评论将在原位展开编辑。";
+  el("interaction-hint").textContent = historicalRevision ? "正在查看原版本，返回最新版本后可继续评论。" : preview ? "正在体验设计，退出预览后可选择元素评论。" : "点击元素即可添加评论或打开进行中的讨论。";
 }
 function togglePreview(): boolean {
   if (!context || historicalRevision) return false;
@@ -873,10 +933,8 @@ el("preview-toggle").onclick = () => { togglePreview(); };
 el("active-tab").onclick = () => { archiveSelected = false; renderComments(); };
 el("archive-tab").onclick = () => { archiveSelected = true; renderComments(); };
 el("cancel-comment").onclick = () => {
-  el("composer").hidden = true;
-  composerBeforePreview = false;
-  selection = undefined;
-  editing = undefined;
+  closeComposer();
+  commentNotice("");
   renderComments();
 };
 el("comment-text").addEventListener("keydown", (e: KeyboardEvent) => {
@@ -885,45 +943,197 @@ el("comment-text").addEventListener("keydown", (e: KeyboardEvent) => {
     el<HTMLFormElement>("composer").requestSubmit();
   }
 });
-el("composer").onsubmit = async (e) => {
-  e.preventDefault();
-  try {
-    const text = el<HTMLTextAreaElement>("comment-text").value;
-    if (editing?.startsWith("reply:")) {
-      const id = editing.slice(6);
-      const replied = await api(`comments/${id}/review`, { action: "reply", message: text });
-      // A running MCP process may still use the previous server module after
-      // a local build. Keep reply reopening available until its next restart.
-      const active = context.batches.some((b: any) =>
-        ["queued", "processing"].includes(b.status) && b.items.some((item: any) => item.id === id));
-      if (replied.status !== "draft" && !active)
-        await api(`comments/${id}/review`, { action: "reopen" });
-      if (replied.status === "draft" || !active) archiveSelected = false;
+const cardActionProgress = { delete: "删除中", archive: "存档中", resolve: "存档中", reopen: "打开中" } as const;
+type CardAction = keyof typeof cardActionProgress;
+type CommentChange = {
+  id: string;
+  target: Target;
+  apply: (current: Comment | undefined, acknowledged: boolean) => Comment | undefined;
+  send: () => Promise<unknown>;
+  draft?: { text: string; restore: () => void };
+  body?: { creating: boolean; text: string };
+  action?: CardAction;
+  onSuccess?: () => void;
+};
+type PendingCommentChange = CommentChange & { acknowledged: boolean; failed: boolean; task: Promise<void> };
+const commentChanges = new Set<PendingCommentChange>();
+function pendingBody(id: string) {
+  return [...commentChanges].findLast(change => change.id === id && change.body && !change.acknowledged);
+}
+function pendingCardAction(id: string) {
+  return [...commentChanges].find(change => change.id === id && change.action && !change.acknowledged);
+}
+
+function visibleComments(): Comment[] {
+  const comments = new Map<string, Comment>((context.comments as Comment[]).map(comment => [comment.id, comment]));
+  for (const change of commentChanges) {
+    const updated = change.apply(comments.get(change.id), change.acknowledged);
+    if (updated) comments.set(change.id, updated);
+    else comments.delete(change.id);
+  }
+  return [...comments.values()];
+}
+
+function addCommentChange(change: CommentChange) {
+  const previous = [...commentChanges].filter(pending => !pending.acknowledged && !pending.failed &&
+    (pending.id === change.id || sameCommentElement(pending.target, change.target)));
+  const task = Promise.all(previous.map(pending => pending.task)).then(async () => {
+    try {
+      await change.send();
+    } catch (error) {
+      if (pending.body) pending.failed = true;
+      else commentChanges.delete(pending);
+      renderComments();
+      reportCommentFailure(pending, error);
+      return;
     }
-    else if (editing) await api(`comments/${editing}`, { text }, "PATCH");
-    else if (selection) await api("comments", { text, target: selection });
-    el("composer").hidden = true;
-    composerBeforePreview = false;
-    editing = undefined;
-    await refresh();
-    notice("评论已保存。请在 AI 对话中说：我已评论，可以更新。");
-  } catch (e: any) {
-    if (e.code === "comment_exists" && e.details?.existingCommentId) {
-      await refresh();
-      notice("该元素已有评论，当前输入已保留。", "warning");
-      el("notice").append(button("在已有讨论中补充", () => {
-        const existing = context.comments.find((c: any) => c.id === e.details.existingCommentId);
-        if (!existing) return notice("已有评论已变化，请刷新后重试；当前输入仍保留。", "warning");
-        selection = existing.target;
-        editing = `reply:${existing.id}`;
-        activeCommentId = existing.id;
-        archiveSelected = existing.status === "resolved";
-        renderComments();
-        el("comment-text").focus();
-      }));
-    } else notice(e.message, "error");
+    pending.acknowledged = true;
+    pending.onSuccess?.();
+    renderComments();
+    // Keep applying the change until a read issued after the write has completed.
+    void refreshCommentList();
+  });
+  const pending = { ...change, acknowledged: false, failed: false, task };
+  commentChanges.add(pending);
+  renderComments();
+}
+
+function reportCommentFailure(change: PendingCommentChange, error: unknown) {
+  const failure = error as { code?: string; message?: string; details?: { existingCommentId?: string } };
+  const conflictId = failure.code === "comment_exists" ? failure.details?.existingCommentId : undefined;
+  if (change.body) {
+    if (conflictId) {
+      commentNotice("该元素已有进行中的讨论，待提交正文已保留。", "warning",
+        openConflictingDiscussion(conflictId, change.body.text, () => {
+          commentChanges.delete(change);
+          renderComments();
+        }));
+    } else commentNotice(`评论提交失败。 ${failure.message ?? ""}`, "error");
+    return;
+  }
+  if (change.action) {
+    if (conflictId)
+      commentNotice("该元素已有进行中的讨论。", "warning", openConflictingDiscussion(conflictId));
+    else commentNotice(`评论操作失败。 ${failure.message ?? ""}`, "error");
+    return;
+  }
+  const entry = document.createElement("div");
+  entry.className = "hint comment-feedback";
+  entry.dataset.tone = conflictId ? "warning" : "error";
+  const status = document.createElement("span");
+  status.setAttribute("role", conflictId ? "status" : "alert");
+  const actions = [];
+  if (conflictId && change.draft)
+    actions.push(openConflictingDiscussion(conflictId, change.draft.text, () => entry.remove()));
+  else actions.push(button("重试提交", () => {
+    entry.remove();
+    addCommentChange(change);
+  }));
+  if (change.draft) actions.push(button("恢复输入", () => {
+    change.draft!.restore();
+    entry.remove();
+  }));
+  entry.append(status, ...actions);
+  el("comment-failures").append(entry);
+  status.textContent = conflictId ? "该元素已有进行中的讨论，已保留输入。" :
+    `评论同步失败。 ${failure.message ?? "请重试。"}`;
+}
+
+function runCommentAction(comment: Comment, action: CardAction) {
+  if (pendingBody(comment.id) || pendingCardAction(comment.id)) return;
+  commentNotice("");
+  let confirmed: Comment | undefined;
+  addCommentChange({
+    id: comment.id,
+    target: comment.target,
+    action,
+    apply: (_current, acknowledged) => acknowledged ? confirmed : comment,
+    send: async () => {
+      if (action === "delete") await api(`comments/${comment.id}`, undefined, "DELETE");
+      else confirmed = await api(`comments/${comment.id}/review`, { action });
+    },
+    onSuccess: () => {
+      if (editing?.replace(/^reply:/, "") === comment.id) closeComposer();
+      if (action === "delete" && activeCommentId === comment.id) activeCommentId = undefined;
+      if (action === "reopen") archiveSelected = false;
+    },
+  });
+}
+
+el("composer").onsubmit = (e) => {
+  e.preventDefault();
+  const input = el<HTMLTextAreaElement>("comment-text").value;
+  const text = input.trim();
+  const target = selection;
+  if (!text || !target) return;
+  if (input.length > 20000) return commentNotice("评论最多可输入 20000 个字符。", "error");
+
+  const reply = editing?.startsWith("reply:");
+  const existing = visibleComments().find(c => c.id === editing?.replace(/^reply:/, ""));
+  if (editing && !existing) return commentNotice("评论已变化，当前输入仍保留。", "warning");
+  const previous = existing && pendingBody(existing.id);
+  if (existing && pendingCardAction(existing.id)) return;
+  if (previous && !previous.failed) return;
+  commentNotice("");
+  const draft = { text: input, restore: () => {
+    const current = existing && visibleComments().find(c => c.id === existing.id);
+    compose(current?.target ?? target, current, reply && current ? input : undefined);
+    el<HTMLTextAreaElement>("comment-text").value = input;
+  } };
+  closeComposer();
+
+  if (!existing || !reply) {
+    const creating = !existing || previous?.body?.creating === true;
+    const comment: Comment = existing ?? { id: browserUuid(), text, target, status: "draft", results: [], thread: [] };
+    if (previous) commentChanges.delete(previous);
+    activeCommentId = comment.id;
+    addCommentChange({
+      id: comment.id, target, body: { creating, text: input },
+      apply: (current, acknowledged) => ({
+        ...(current ?? comment), text: acknowledged ? text : input,
+        ...(!acknowledged ? { status: "draft" as const } : {}),
+      }),
+      send: async () => {
+        if (creating) {
+          const saved = await api("comments", { id: comment.id, text, target });
+          if (saved.text === text) return;
+        }
+        await api(`comments/${comment.id}`, { text }, "PATCH");
+      },
+    });
+  } else {
+    const messageId = browserUuid();
+    const entry = { author: "user", text: input, at: Date.now(), messageId };
+    if (existing.status === "resolved") archiveSelected = false;
+    addCommentChange({
+      id: existing.id, target, draft,
+      apply: current => {
+        if (!current || current.thread.some(message => message.messageId === messageId)) return current;
+        const updated = { ...current, thread: [...current.thread, entry] };
+        if (current.status !== "draft" && !commentFacts(current, context.batches).busy) {
+          updated.previousDraft = { text: current.text, status: current.status };
+          updated.status = "draft";
+        }
+        return updated;
+      },
+      send: () => api(`comments/${existing.id}/review`, { action: "reply", message: input, messageId }),
+    });
   }
 };
+
+async function refreshCommentList() {
+  try {
+    await refresh();
+  } catch {
+    if (![...commentChanges].some(change => change.acknowledged)) return;
+    const notice = el("comment-refresh-notice");
+    if (notice.hasChildNodes()) return;
+    const status = document.createElement("span");
+    status.setAttribute("role", "status");
+    notice.append(status, button("重试刷新", refreshCommentList));
+    status.textContent = "评论已提交，列表同步失败。";
+  }
+}
 el("return-latest").onclick = async () => {
   const requested = ++navigation;
   if (cancelStateSwitch()) renderCanvas();

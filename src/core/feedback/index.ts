@@ -17,7 +17,7 @@ export type Comment = {
     | "resolved";
   resolution?: "confirmed" | "archived";
   previousDraft?: { text: string; status: Comment["status"] };
-  thread: { author: string; text: string; at: number }[];
+  thread: { author: string; text: string; at: number; messageId?: string }[];
   results: {
     batchId: string;
     message: string;
@@ -40,27 +40,33 @@ export type Batch = {
 };
 export class Feedback {
   constructor(public store: Store) {}
-  add(text: string, target: Target) {
+  private ensureNoActiveDiscussion(target: Target) {
+    const existing = findElementComment(this.store.all<Comment>("comment"), target);
+    if (existing)
+      throw new ReviewError("comment_exists", "This element already has an active discussion", 409, { existingCommentId: existing.id });
+  }
+  add(text: string, target: Target, id: string = randomUUID()) {
     ensure(
       text.trim() && text.length <= 20000,
       "invalid_comment",
       "Comment must contain 1–20000 characters",
     );
     const comment: Comment = {
-      id: randomUUID(),
+      id,
       text: text.trim(),
       target: targetSchema.parse(target),
       status: "draft",
       thread: [],
       results: [],
     };
-    this.store.transaction(() => {
-      const existing = findElementComment(this.store.all<Comment>("comment"), comment.target);
-      if (existing) throw new ReviewError("comment_exists", "This element already has a discussion", 409, { existingCommentId: existing.id });
+    return this.store.transaction(() => {
+      const saved = this.store.get<Comment>("comment", id);
+      if (saved) return saved;
+      this.ensureNoActiveDiscussion(comment.target);
       this.store.put("comment", comment);
       this.store.event("comment.created", comment);
+      return comment;
     });
-    return comment;
   }
   comment(id: string) {
     const c = this.store.get<Comment>("comment", id);
@@ -236,20 +242,22 @@ export class Feedback {
       return b;
     });
   }
-  review(id: string, action: "resolve" | "archive" | "reopen" | "reply" | "cancel_reopen", message = "") {
+  review(id: string, action: "resolve" | "archive" | "reopen" | "reply" | "cancel_reopen", message = "", messageId?: string) {
     return this.store.transaction(() => {
       const c = this.comment(id);
+      if (action === "reply" && messageId && c.thread.some(reply => reply.messageId === messageId))
+        return c;
       const { busy } = commentFacts(c, this.store.all<Batch>("batch"));
       if (action !== "reply") ensure(!busy, "batch_active", "Wait until the current batch is released or published", 409);
       if (action === "reply") ensure(message.trim() && message.length <= 20000, "invalid_comment", "Reply must contain 1–20000 characters");
+      if (c.status === "resolved" && (action === "reopen" || (action === "reply" && !busy)))
+        this.ensureNoActiveDiscussion(c.target);
       if (message.trim())
-        c.thread.push({ author: "user", text: message, at: Date.now() });
+        c.thread.push({ author: "user", text: message, at: Date.now(), ...(action === "reply" && messageId ? { messageId } : {}) });
       if (action === "reply" && message.trim()) {
-        const active = this.store.all<Batch>("batch").some(b =>
-          (b.status === "queued" || b.status === "processing") && b.items.some(item => item.id === id));
         // Replies remain separate from fixed batch inputs. Outside a running
         // batch, a user's follow-up is immediately available for the next round.
-        if (!active && c.status !== "draft") {
+        if (!busy && c.status !== "draft") {
           c.previousDraft = { text: c.text, status: c.status };
           c.status = "draft";
         }

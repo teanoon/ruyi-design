@@ -17,8 +17,7 @@ export function sameCommentElement(left: Target, right: Target): boolean {
 }
 /** Input order is stable creation order; legacy duplicates are never rewritten. */
 export function findElementComment<T extends CommentSummary>(comments: T[], target: Target): T | undefined {
-  const matches = comments.filter(c => sameCommentElement(c.target, target)).reverse();
-  return matches.find(c => c.status !== "resolved") ?? matches[0];
+  return comments.findLast(c => c.status !== "resolved" && sameCommentElement(c.target, target));
 }
 export function commentFacts(comment: CommentSummary, batches: BatchSummary[]) {
   const related = batches.filter(b => b.items.some(item => item.id === comment.id));
@@ -28,7 +27,7 @@ export function commentFacts(comment: CommentSummary, batches: BatchSummary[]) {
     hasHistory: related.length > 0 || comment.results.length > 0,
   };
 }
-export type CommentAction = "locate" | "original" | "edit" | "delete" | "reply" | "resolve" | "reopen" | "cancel_reopen";
+export type CommentAction = "locate" | "original" | "edit" | "delete" | "reply" | "resolve" | "archive" | "reopen" | "cancel_reopen";
 export function commentActions(comment: CommentSummary, batches: BatchSummary[], latestRevisionId: string): CommentAction[] {
   const { busy, hasHistory } = commentFacts(comment, batches);
   const actions: CommentAction[] = [];
@@ -37,10 +36,11 @@ export function commentActions(comment: CommentSummary, batches: BatchSummary[],
     actions.push("locate");
     if (comment.target.revisionId !== latestRevisionId) actions.push("original");
   }
-  if (busy || comment.status === "submitted" || comment.status === "needs_clarification") return [...actions, "reply"];
+  if (busy) return [...actions, "reply"];
   if (comment.status === "resolved") return [...actions, "reply", "reopen"];
-  if (comment.status === "awaiting_review") return [...actions, "reply", "resolve", "reopen"];
-  if (comment.previousDraft) return [...actions, "reply", "edit", "cancel_reopen"];
-  if (hasHistory) return [...actions, "reply", "edit"];
-  return [...actions, "edit", "delete"];
+  if (comment.status === "submitted" || comment.status === "needs_clarification") return [...actions, "reply", "archive"];
+  if (comment.status === "awaiting_review") return [...actions, "reply", "resolve", "reopen", "archive"];
+  if (comment.previousDraft) return [...actions, "reply", "edit", "cancel_reopen", "archive"];
+  if (hasHistory) return [...actions, "reply", "edit", "archive"];
+  return [...actions, "edit", "delete", "archive"];
 }

@@ -16,7 +16,14 @@ try{
  const tools=(await client.listTools()).tools;assert.equal(tools.length,9);assert(tools.find(t=>t.name==='ruyi_design_publish_revision').inputSchema.properties.source);
  const info=await call('ruyi_design_start_review',{projectRoot:root,designRoot:design}),sid={sessionId:info.sessionId};
  browser=await chromium.launch();const page=await browser.newPage();await page.goto(info.reviewUrl);const frame=()=>page.frameLocator('iframe').first();
- await frame().getByRole('button',{name:'Comment target',exact:true}).click();await page.getByLabel('评论内容',{exact:true}).fill('Saved for a later feedback round');await page.getByRole('button',{name:'保存评论',exact:true}).click();await page.getByText('Saved for a later feedback round',{exact:true}).waitFor();
+ await frame().getByRole('button',{name:'Comment target',exact:true}).click();
+ await page.getByLabel('评论内容',{exact:true}).fill('Saved for a later feedback round');
+ const [savedResponse]=await Promise.all([
+  page.waitForResponse(response=>response.request().method()==='POST'&&new URL(response.url()).pathname.endsWith('/comments')),
+  page.getByRole('button',{name:'保存评论',exact:true}).click(),
+ ]);
+ assert(savedResponse.ok());
+ await page.getByText('Saved for a later feedback round',{exact:true}).waitFor();
  const before=await call('ruyi_design_get_review_context',sid),location=page.url();
  const publish={...sid,source:'conversation',request:'Refine both logo concepts from the user conversation',idempotencyKey:'conversation-1',expectedBaseRevision:info.revisionId};
  assert((await raw('ruyi_design_publish_revision',{...publish,request:undefined})).isError);

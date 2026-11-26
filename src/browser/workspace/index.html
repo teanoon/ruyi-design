@@ -46,11 +46,14 @@
         </main>
         <aside class="feedback">
           <div class="feedback-heading"><h2>评审反馈</h2><span id="count" class="badge">0</span></div>
-          <p class="hint" id="interaction-hint">选择画布中的元素，已有评论将在原位展开编辑。</p>
+          <p class="hint" id="interaction-hint">点击元素即可添加评论或打开进行中的讨论。</p>
           <div class="comment-tabs" role="group" aria-label="评论分组">
             <button id="active-tab" aria-pressed="true" aria-controls="active-comments">进行中 0</button>
             <button id="archive-tab" aria-pressed="false" aria-controls="archived-comments">已归档（0）</button>
           </div>
+          <div id="comment-notice" class="hint comment-feedback"><span role="status"></span></div>
+          <div id="comment-failures"></div>
+          <div id="comment-refresh-notice" class="hint comment-feedback"></div>
           <form id="composer" hidden>
             <label for="comment-text">评论内容</label><div id="target-label" class="hint"></div>
             <textarea id="comment-text" rows="4" required placeholder="描述你希望如何改进…"></textarea>

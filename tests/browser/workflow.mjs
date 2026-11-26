@@ -56,6 +56,15 @@ export async function workflow({
     const page = await browser.newPage({
       viewport: { width: 1440, height: 1050 },
     });
+    async function saveComment() {
+      const [response] = await Promise.all([
+        page.waitForResponse(candidate =>
+          candidate.request().method() === "POST" && new URL(candidate.url()).pathname.endsWith("/comments"),
+        ),
+        page.getByRole("button", { name: "保存评论" }).click(),
+      ]);
+      assert(response.ok());
+    }
     const errors = [];
     page.on("pageerror", (e) => errors.push(e.message));
     await page.goto(info.reviewUrl);
@@ -66,7 +75,7 @@ export async function workflow({
 
     await frame().getByRole("button", { name: "登录工作空间" }).click();
     await page.getByLabel("评论内容").fill("增加登录按钮的留白。");
-    await page.getByRole("button", { name: "保存评论" }).click();
+    await saveComment();
     assert.equal(await page.getByRole("button", { name: "提交给 AI", exact: true }).count(), 0);
     await page.waitForFunction(() => document.getElementById("pending-count")?.textContent === "1 条评论待处理");
     const saved = await call("ruyi_design_get_review_context", sid);
@@ -99,7 +108,7 @@ export async function workflow({
     await writeFile(css, original + "\n.ui-button{min-height:56px}\n");
     await frame().locator("#email").click();
     await page.getByLabel("评论内容").fill("这是下一轮的待处理评论。");
-    await page.getByRole("button", { name: "保存评论" }).click();
+    await saveComment();
     const frozenRetry = await call("ruyi_design_prepare_update", { ...sid, idempotencyKey: "update-1" });
     assert.equal(frozenRetry.id, b.id);
     assert.equal(frozenRetry.items.length, 1);
@@ -212,7 +221,7 @@ export async function workflow({
     );
     await page.getByRole("button", { name: "评论此令牌" }).first().click();
     await page.getByLabel("评论内容").fill("验证失败必须保留旧版。");
-    await page.getByRole("button", { name: "保存评论" }).click();
+    await saveComment();
     const b3 = await call("ruyi_design_prepare_update", { ...sid, idempotencyKey: "update-3" }),
       c3 = await call("ruyi_design_claim_batch", {
         ...sid,

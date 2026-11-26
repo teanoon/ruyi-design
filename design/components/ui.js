@@ -13,9 +13,13 @@ export function icon(name, cls='') {return `<svg class="icon ${cls}" viewBox="0 
 export function button(label, {action='',variant='secondary',symbol='',disabled=false,id='',shortcut='',pressed,version=''}={}) {return `<button type="button" class="button ${variant}" ${action?`data-action="${action}"`:''} ${disabled?'disabled':''} ${id?`data-review-id="${id}"`:''} ${pressed===undefined?'':`aria-pressed="${pressed}"`} ${shortcut?`aria-keyshortcuts="${escapeHtml(shortcut)}"`:''} ${shortcut||version?`aria-describedby="${shortcut?'shortcut-help':''} ${version?'preview-version-description':''}"`:''}>${symbol?icon(symbol):''}<span>${label}</span>${version?`<span class="preview-version" aria-hidden="true" title="版本 ${escapeHtml(version)}">${escapeHtml(version)}</span>`:''}${shortcut?`<kbd aria-hidden="true">${escapeHtml(shortcut)}</kbd>`:''}</button>${version?`<span id="preview-version-description" class="sr-only">当前版本 ${escapeHtml(version)}</span>`:''}`}
 export function workspaceBrand() {return `<div class="workspace-brand" aria-label="如意设计工作区" data-review-id="workspace-brand"><img src="../assets/ruyi-mark.svg" alt="" width="40" height="40"/><span class="workspace-brand-name">如意设计</span><span class="connection-status" data-review-id="connection-status" role="status" data-state="connected"><span class="connection-state-label">已连接</span></span></div>`}
 export function badge(label,tone='neutral'){return `<span class="badge ${tone}">${label}</span>`}
-export function commentActions({status='待处理',archived=false,busy=false,reopened=false,hasHistory=false,hasOriginal=false,hasAnchor=true}={}) {
+export function commentActions({status='待处理',archived=false,busy=false,reopened=false,hasHistory=false,hasOriginal=false,hasAnchor=true,submission}={}) {
  const actions=[];
  if(hasAnchor)actions.push(['定位','locate']);
+ if(submission){
+  if(submission==='failed')actions.push(['编辑','edit'],['重新提交','resubmit']);
+  return actions;
+ }
  if(hasAnchor&&hasOriginal)actions.push(['查看原版本','compare']);
  if(busy||['已纳入更新','处理中','待澄清'].includes(status))actions.push(['回复','reply']);
  else if(archived||['已解决','已归档'].includes(status))actions.push(['回复','reply'],['重新打开','reopen']);
@@ -23,11 +27,14 @@ export function commentActions({status='待处理',archived=false,busy=false,reo
  else if(reopened)actions.push(['回复','reply'],['编辑','edit'],['撤销重新打开','cancel-reopen']);
  else if(hasHistory)actions.push(['回复','reply'],['编辑','edit']);
  else actions.push(['编辑','edit'],['删除','delete']);
+ if(!busy&&!archived&&!['已解决','已归档','处理中'].includes(status))actions.push(['存档','archive']);
  return actions;
 }
-export function commentCard({text='标题可以再松弛一点，增加行高。',status='待处理',archived=false,selected=false,id='sample',editor='',resolution='',context='首页 · 桌面',busy=false,reopened=false,hasHistory=false,hasOriginal=false,hasAnchor=true,thread=[],legacy=false}={}) {
- const options={status,archived,busy,reopened,hasHistory,hasOriginal,hasAnchor};
- return `<article class="comment-card ${selected?'selected':''}" data-review-id="comment-${escapeHtml(id)}" data-comment-id="${escapeHtml(id)}" data-status="${escapeHtml(status)}"><div class="comment-meta">${escapeHtml(context)} · ${archived?(resolution==='confirmed'?'已解决':'已归档'):status}${legacy?' · 历史记录':''}</div><p>${escapeHtml(text)}</p>${status==='待复核'?'<div class="ai-reply"><strong>AI</strong><span>已调整标题行高与上下留白，请体验后确认。</span></div>':''}${thread.map(t=>`<div class="comment-thread"><strong>${t.author==='agent'?'AI':'你'}</strong><span>${escapeHtml(t.text)}</span></div>`).join('')}${editor}<div class="comment-actions">${commentActions(options).map(([label,action])=>button(label,{action,variant:action==='resolve'?'primary':action==='delete'?'text danger':'text'})).join('')}</div></article>`;
+const actionProgress={delete:'删除中',archive:'存档中',resolve:'存档中',reopen:'打开中'};
+export function commentCard({text='标题可以再松弛一点，增加行高。',status='待处理',archived=false,selected=false,id='sample',editor='',resolution='',context='首页 · 桌面',busy=false,reopened=false,hasHistory=false,hasOriginal=false,hasAnchor=true,thread=[],legacy=false,submission,pendingAction}={}) {
+ const options={status,archived,busy,reopened,hasHistory,hasOriginal,hasAnchor,submission};
+ const displayStatus=submission?'待提交':archived?(resolution==='confirmed'?'已解决':'已归档'):status;
+ return `<article class="comment-card ${selected?'selected':''}" data-review-id="comment-${escapeHtml(id)}" data-comment-id="${escapeHtml(id)}" data-status="${escapeHtml(displayStatus)}"><div class="comment-meta">${escapeHtml(context)} · ${displayStatus}${legacy?' · 历史记录':''}</div><p>${escapeHtml(text)}</p>${status==='待复核'?'<div class="ai-reply"><strong>AI</strong><span>已调整标题行高与上下留白，请体验后确认。</span></div>':''}${thread.map(t=>`<div class="comment-thread"><strong>${t.author==='agent'?'AI':'你'}</strong><span>${escapeHtml(t.text)}</span></div>`).join('')}${editor}<div class="comment-actions">${commentActions(options).map(([label,action])=>button(pendingAction===action?actionProgress[action]:label,{action,disabled:!!pendingAction&&action!=='locate'&&action!=='compare',variant:action==='resolve'?'primary':action==='delete'||action==='resubmit'?'text danger':'text'})).join('')}</div></article>`;
 }
 export function revisionBanner(kind='current') {return kind==='deleted'?`<div class="revision-banner warning">${icon('history')}<div><strong>这部分内容已删除</strong><p>保留原始评论和原版本，可对照查看修改前的内容。</p></div>${button('查看原版本',{action:'original',variant:'secondary'})}</div>`:`<div class="revision-banner">${icon('check')}<div><strong>新版本已发布，等你复核</strong><p>本轮调整了标题留白与按钮层次，已有评论和交互上下文仍然保留。</p></div>${button('查看修改',{action:'review',variant:'secondary'})}</div>`}
 export const samplePages = [
