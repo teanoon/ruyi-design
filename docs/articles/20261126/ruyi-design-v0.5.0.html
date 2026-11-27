@@ -70,7 +70,12 @@
 <h2>快来试试如意设计</h2>
 <p>手上正有一个想验证的界面？把这段话发给你正在用的 AI 编程客户端，就可以从自己的项目开始体验如意设计 v0.5.0。</p>
 <blockquote>
-<p>请从 npmjs 官方 registry 安装已发布的如意设计包。在当前项目运行 <code>npm install -D @littlehobby/ruyi-design --registry=https://registry.npmjs.org</code>。安装后，阅读官方中文 README 的「快速开始」和「交给 AI」两节，完成环境检查并为当前编程客户端配置 MCP，保留已有配置。如果你是 Codex，也请安装项目级 <code>ruyi-design-review</code> 技能。需要我重新连接客户端时，请告诉我怎么操作。连接后确认 <code>ruyi_design</code> 工具可用。</p>
+<p>请从 npmjs 官方 registry 安装如意设计。先确认当前项目是否使用 npm，再选择安装方式。</p>
+<ul>
+<li>已有 npm 项目运行 <code>npm install -D @littlehobby/ruyi-design --registry=https://registry.npmjs.org</code>，MCP 使用 <code>npx --no-install ruyi-design mcp</code>。</li>
+<li>其他项目在运行 MCP 的环境中执行 <code>npm install -g @littlehobby/ruyi-design --registry=https://registry.npmjs.org</code>，MCP 使用 <code>ruyi-design mcp</code>。如果客户端找不到该命令，就使用全局 CLI 可执行文件的绝对路径。</li>
+</ul>
+<p>把 MCP 的工作目录设为当前项目根目录，保留已有配置。参考官方中文 README，用对应的 CLI 执行 <code>doctor</code>。如果使用 Codex，再通过该 CLI 执行 <code>setup --client codex --project &lt;项目绝对路径&gt;</code> 来安装评审技能。需要我重新连接客户端时，请告诉我怎么操作。连接后确认 <code>ruyi_design</code> 工具可用。</p>
 <p><a href="https://github.com/teanoon/ruyi-design/blob/main/README.zh-CN.md">如意设计官方中文 README</a></p>
 </blockquote>
 <p>小爱好出品</p>
